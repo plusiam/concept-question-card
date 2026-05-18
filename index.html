@@ -24,6 +24,16 @@
           data-placeholder="오늘의 주제를 입력하세요 (예: 놀이터)"
         ></div>
       </div>
+      <div class="header-identity-row">
+        <span class="header-id-prefix">👥</span>
+        <div
+          class="header-identity"
+          id="headerIdentity"
+          contenteditable="true"
+          spellcheck="false"
+          data-placeholder="학반 · 이름 또는 모둠 (예: 5-3 한지우)"
+        ></div>
+      </div>
       <div
         class="header-context"
         id="headerContext"
@@ -85,25 +95,10 @@
 <div class="modal-overlay hidden" id="modalOverlay">
   <div class="modal-box modal-box-sm">
     <div>
-      <div class="modal-title">⚙️ 설정</div>
-      <div class="modal-subtitle">학생·모둠 이름과 표시할 개념을 정해요.</div>
+      <div class="modal-title">⚙️ 개념 컬럼 설정</div>
+      <div class="modal-subtitle">분류 보드에 표시할 개념을 골라요. 비워두면 7개 전체 표시.</div>
     </div>
     <div class="form-group">
-      <label class="form-label" for="inputGroupName">
-        학생 / 모둠 이름 <span class="optional">선택</span>
-      </label>
-      <input
-        class="form-input"
-        id="inputGroupName"
-        type="text"
-        placeholder="예: 한지우 / 1모둠"
-        maxlength="30"
-      >
-    </div>
-    <div class="form-group">
-      <label class="form-label">
-        개념 컬럼 <span class="optional">비워두면 7개 전체 표시</span>
-      </label>
       <div class="concept-check-grid" id="conceptCheckGrid"></div>
     </div>
     <div class="modal-actions">

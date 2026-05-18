@@ -134,6 +134,45 @@ body {
   font-style: italic;
 }
 
+/* 헤더 식별 정보 (학반·이름/모둠) */
+.header-identity-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.header-id-prefix {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.header-identity {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-sub);
+  outline: none;
+  min-width: 80px;
+  max-width: 360px;
+  padding: 0 2px;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s;
+  cursor: text;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.header-identity:focus {
+  border-bottom-color: var(--color-primary);
+}
+
+.header-identity:empty::before {
+  content: attr(data-placeholder);
+  color: #C4C9D4;
+  font-style: italic;
+  font-weight: 400;
+}
+
 .btn-settings {
   background: none;
   border: 1px solid var(--color-border);
@@ -823,6 +862,7 @@ body {
   display: flex;
   gap: 8px;
   align-items: center;
+  justify-content: flex-end;
 }
 
 .author-input {

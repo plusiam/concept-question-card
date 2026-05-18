@@ -53,11 +53,10 @@ function generateId() {
   return 'q_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 }
 
-function addQuestion(text, author) {
+function addQuestion(text) {
   const q = {
     id: generateId(),
     text: text.trim(),
-    author: author.trim() || '',
     conceptIds: [],
     starred: false,
     createdAt: new Date().toISOString()
@@ -255,13 +254,6 @@ function renderPhase1() {
           maxlength="120"
         ></textarea>
         <div class="input-row">
-          <input
-            id="authorInput"
-            class="author-input"
-            type="text"
-            placeholder="모둠 이름 (선택)"
-            maxlength="20"
-          >
           <button class="btn btn-primary btn-add" id="btnAddQuestion" disabled>+ 추가</button>
         </div>
       </div>
@@ -389,7 +381,7 @@ function renderQuestionCard(q, concept) {
       <div class="q-card unclassified-card${expanded ? ' expanded' : ''}" data-id="${q.id}">
         <div class="q-card-text">${escapeHtml(q.text)}</div>
         <div class="q-card-footer">
-          ${q.author ? `<span class="q-author-tag">${escapeHtml(q.author)}</span>` : '<span></span>'}
+          <span></span>
           <button class="btn-icon btn-delete-card" data-id="${q.id}" title="질문 삭제">✕</button>
         </div>
         ${expanded
@@ -433,7 +425,7 @@ function renderQuestionCard(q, concept) {
       ${otherConcepts.length > 0 ? `<div class="concept-dots">${dotHtml}</div>` : ''}
       <div class="q-card-text">${escapeHtml(q.text)}</div>
       <div class="q-card-footer">
-        ${q.author ? `<span class="q-author-tag" style="color:${concept.palette.text}">${escapeHtml(q.author)}</span>` : '<span></span>'}
+        <span></span>
         <div class="q-card-actions">
           ${addBtnHtml}
           ${removeBtnHtml}
@@ -464,11 +456,10 @@ function bindInputEvents() {
 
 function addAndRenderQuestion() {
   const input = document.getElementById('questionInput');
-  const authorInput = document.getElementById('authorInput');
   if (!input) return;
   const text = input.value.trim();
   if (!text) return;
-  addQuestion(text, authorInput?.value || '');
+  addQuestion(text);
   input.value = '';
   const btn = document.getElementById('btnAddQuestion');
   if (btn) btn.disabled = true;
@@ -662,7 +653,6 @@ function renderInquiry() {
                 ${q.starred ? '★' : '☆'}
               </button>
               <span class="phase3-q-text">${escapeHtml(q.text)}</span>
-              ${q.author ? `<span class="q-author-tag">${escapeHtml(q.author)}</span>` : ''}
             </div>
           `).join('')}
         </div>
@@ -747,10 +737,8 @@ function switchPhase(phaseNum) {
 
 // ── 헤더 인라인 편집 ──────────────────────────────────
 function bindHeaderEdit() {
-  const topicEl = document.getElementById('headerTopic');
-  const contextEl = document.getElementById('headerContext');
-
-  function bindField(el, stateKey) {
+  function bindField(id, stateKey) {
+    const el = document.getElementById(id);
     if (!el) return;
     el.addEventListener('blur', () => {
       state.unitMeta[stateKey] = el.textContent.trim();
@@ -761,21 +749,23 @@ function bindHeaderEdit() {
     });
   }
 
-  bindField(topicEl, 'unitTitle');
-  bindField(contextEl, 'centralIdea');
+  bindField('headerTopic', 'unitTitle');
+  bindField('headerIdentity', 'groupName');
+  bindField('headerContext', 'centralIdea');
 }
 
 function updateHeader() {
   const topicEl = document.getElementById('headerTopic');
+  const identityEl = document.getElementById('headerIdentity');
   const contextEl = document.getElementById('headerContext');
   if (topicEl) topicEl.textContent = state.unitMeta.unitTitle || '';
+  if (identityEl) identityEl.textContent = state.unitMeta.groupName || '';
   if (contextEl) contextEl.textContent = state.unitMeta.centralIdea || '';
 }
 
 // ── 설정 모달 ─────────────────────────────────────────
 function openModal() {
   document.getElementById('modalOverlay').classList.remove('hidden');
-  document.getElementById('inputGroupName').value = state.unitMeta.groupName || '';
   document.querySelectorAll('.concept-check-item input').forEach(cb => {
     cb.checked = state.unitMeta.enabledConcepts
       ? state.unitMeta.enabledConcepts.includes(cb.dataset.conceptId)
@@ -788,7 +778,6 @@ function closeModal() {
 }
 
 function saveModal() {
-  state.unitMeta.groupName = document.getElementById('inputGroupName').value.trim();
   const checked = [...document.querySelectorAll('.concept-check-item input:checked')]
     .map(cb => cb.dataset.conceptId);
   state.unitMeta.enabledConcepts = checked.length > 0 ? checked : null;
