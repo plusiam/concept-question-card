@@ -1351,17 +1351,66 @@ body {
 .concept-pick-btn:hover { transform: scale(1.04); opacity: 0.9; }
 .concept-pick-btn:active { transform: scale(0.98); }
 
-/* ── 인쇄 (M5에서 채움) ── */
+/* ── 인쇄 / PDF 출력 ── */
+.print-header { display: none; }
+
 @media print {
+  /* 화면 전용 요소 숨김 */
   .app-header,
   .phase-nav,
-  .modal-overlay { display: none !important; }
-
-  body { background: white; }
-
-  .concept-board {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 6px;
+  .modal-overlay,
+  .input-area,
+  .scaffold-bar,
+  .seed-input-area,
+  .seed-stats,
+  .btn-icon,
+  .btn-add-concept,
+  .btn-remove-concept,
+  .btn-delete-card,
+  .btn-seed-delete,
+  .concept-pick-btn,
+  .inline-picker,
+  .card-tap-hint {
+    display: none !important;
   }
+
+  /* 배경색·테두리색을 인쇄에 반영 */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body { background: #fff; }
+  .app-main { padding: 0; overflow: visible; }
+  .phase-panel { display: none !important; }
+  .phase-panel.active { display: block !important; }
+
+  /* 인쇄용 머리말 */
+  .print-header {
+    display: block !important;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #333;
+  }
+  .print-title { font-size: 18px; font-weight: 700; color: #000; }
+  .print-step { font-size: 13px; font-weight: 400; color: #555; }
+  .print-sub { font-size: 12px; color: #555; margin-top: 3px; }
+
+  /* 보드 — 7컬럼을 지면 폭에 맞춤 */
+  .concept-board { grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .concept-col { min-height: auto; }
+  .phase3-sidebar { position: static; }
+
+  /* 페이지 경계에서 잘리지 않도록 */
+  .concept-col,
+  .q-card,
+  .seed-card,
+  .phase3-concept-group,
+  .loi-card { break-inside: avoid; }
+
+  /* 잉크 절약 — 그림자 제거 */
+  .q-card,
+  .seed-card,
+  .concept-col,
+  .scaffold-bar { box-shadow: none; }
 }

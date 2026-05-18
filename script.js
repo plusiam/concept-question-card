@@ -824,6 +824,36 @@ function exportJSON() {
   URL.revokeObjectURL(url);
 }
 
+// ── 현재 단계 인쇄 / PDF ──────────────────────────────
+function doPrint() {
+  const tab = document.querySelector('.phase-tab.active');
+  const phase = tab ? parseInt(tab.dataset.phase) : 1;
+  const stepNames = ['1단계 단어 모으기', '2단계 질문과 분류', '3단계 탐구 목록'];
+
+  const ph = document.getElementById('printHeader');
+  if (ph) {
+    const topic = state.unitMeta.unitTitle || '주제 미정';
+    const grp = state.unitMeta.groupName ? `${state.unitMeta.groupName} · ` : '';
+    const dateStr = new Date().toLocaleDateString('ko-KR');
+    ph.innerHTML = `
+      <div class="print-title">🔍 ${escapeHtml(topic)}
+        <span class="print-step">${stepNames[phase] || ''}</span></div>
+      <div class="print-sub">${escapeHtml(grp)}${dateStr}</div>
+    `;
+  }
+
+  // 2단계 보드는 컬럼이 7개라 가로, 나머지는 세로
+  let orient = document.getElementById('printOrient');
+  if (!orient) {
+    orient = document.createElement('style');
+    orient.id = 'printOrient';
+    document.head.appendChild(orient);
+  }
+  orient.textContent = `@page { size: A4 ${phase === 1 ? 'landscape' : 'portrait'}; margin: 12mm; }`;
+
+  window.print();
+}
+
 function importJSON(file) {
   if (state.questions.length > 0 || state.seeds.length > 0) {
     if (!confirm('지금 화면의 질문과 단어가 불러온 파일 내용으로 모두 바뀝니다. 계속할까요?')) return;
@@ -883,6 +913,7 @@ function bindEvents() {
   });
 
   document.getElementById('btnSettings').addEventListener('click', openModal);
+  document.getElementById('btnPrint').addEventListener('click', doPrint);
   document.getElementById('btnExport').addEventListener('click', exportJSON);
   document.getElementById('btnImport').addEventListener('click', () => {
     document.getElementById('fileImport').click();

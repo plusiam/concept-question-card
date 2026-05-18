@@ -36,6 +36,7 @@
       <span class="autosave-badge" id="autosaveBadge">💾 자동저장</span>
       <button class="btn-settings" id="btnImport">📥 불러오기</button>
       <button class="btn-settings" id="btnExport">📤 내보내기</button>
+      <button class="btn-settings" id="btnPrint">🖨️ 인쇄</button>
       <button class="btn-settings" id="btnSettings">⚙️ 설정</button>
     </div>
     <input type="file" id="fileImport" accept="application/json,.json" hidden>
@@ -59,6 +60,9 @@
 
   <!-- 메인 콘텐츠 -->
   <main class="app-main">
+
+    <!-- 인쇄 전용 머리말 (화면에서는 숨김) -->
+    <div class="print-header" id="printHeader"></div>
 
     <!-- 1단계: 단어 모으기 -->
     <section class="phase-panel" id="panel0">
