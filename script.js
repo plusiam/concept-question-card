@@ -12,6 +12,9 @@ let state = {
 // 현재 인라인으로 펼쳐진 미분류 카드 id
 let expandedCardId = null;
 
+// 질문 시작어 비계에서 펼쳐진 개념 id
+let scaffoldConceptId = null;
+
 // ── LocalStorage ───────────────────────────────────────
 function saveState() {
   try {
@@ -242,58 +245,90 @@ function renderPhase1() {
 
   panel.innerHTML = `
     <div class="board-page">
-      <div class="make-row">
-        <div class="input-area">
-          <div class="input-label">✏️ 새 질문 만들기</div>
-          <textarea
-            id="questionInput"
-            class="question-input"
-            placeholder="이 주제에서 무엇이 궁금한가요? 질문을 써 보세요."
-            rows="3"
-            maxlength="120"
-          ></textarea>
-          <div class="input-row">
-            <input
-              id="authorInput"
-              class="author-input"
-              type="text"
-              placeholder="모둠 이름 (선택)"
-              maxlength="20"
-            >
-            <button class="btn btn-primary btn-add" id="btnAddQuestion" disabled>+ 추가</button>
-          </div>
+      <div class="input-area">
+        <div class="input-label">✏️ 새 질문 만들기</div>
+        <textarea
+          id="questionInput"
+          class="question-input"
+          placeholder="이 주제에서 무엇이 궁금한가요? 질문을 써 보세요."
+          rows="3"
+          maxlength="120"
+        ></textarea>
+        <div class="input-row">
+          <input
+            id="authorInput"
+            class="author-input"
+            type="text"
+            placeholder="모둠 이름 (선택)"
+            maxlength="20"
+          >
+          <button class="btn btn-primary btn-add" id="btnAddQuestion" disabled>+ 추가</button>
         </div>
-
-        <aside class="phase1-sidebar">
-          <div class="sidebar-title">💡 질문 시작어 비계</div>
-          <div class="sidebar-note">개념을 누르면 시작어가 펼쳐져요. 시작어를 누르면 입력란에 들어가요.</div>
-          <div class="sidebar-accordion" id="startsAccordion">
-            ${getActiveConcepts().map(c => `
-              <div class="accordion-item" data-concept="${c.id}">
-                <button class="accordion-header" data-concept="${c.id}"
-                  style="background:${c.palette.bg};color:${c.palette.text};border-color:${c.palette.accent}">
-                  <span>${c.icon} ${c.name}</span>
-                  <span class="accordion-arrow">▸</span>
-                </button>
-                <div class="accordion-body" data-concept="${c.id}">
-                  ${c.starts.map(s => `
-                    <button class="start-chip" data-text="${escapeHtml(s)}">${escapeHtml(s)}</button>
-                  `).join('')}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </aside>
       </div>
+
+      <div class="scaffold-bar" id="scaffoldBar"></div>
 
       <div id="classifyArea"></div>
     </div>
   `;
 
   bindInputEvents();
-  bindStartsAccordion();
+  bindScaffold();
   bindClassifyEvents();
+  renderScaffold();
   renderClassifyArea();
+}
+
+// ── 질문 시작어 비계 (가로 띠) ────────────────────────
+function renderScaffold() {
+  const bar = document.getElementById('scaffoldBar');
+  if (!bar) return;
+  const concepts = getActiveConcepts();
+  const selected = concepts.find(c => c.id === scaffoldConceptId);
+
+  bar.innerHTML = `
+    <div class="scaffold-head">
+      <span class="scaffold-title">💡 질문 시작어 비계</span>
+      <span class="scaffold-note">개념을 누르면 시작어가 나와요. 시작어를 누르면 입력란에 들어가요.</span>
+    </div>
+    <div class="scaffold-chips">
+      ${concepts.map(c => `
+        <button class="scaffold-chip${c.id === scaffoldConceptId ? ' on' : ''}" data-concept="${c.id}"
+          style="background:${c.palette.bg};color:${c.palette.text};border-color:${c.palette.accent}">
+          ${c.icon} ${c.name}
+        </button>
+      `).join('')}
+    </div>
+    ${selected ? `
+      <div class="scaffold-starts">
+        ${selected.starts.map(s => `
+          <button class="start-chip" data-text="${escapeHtml(s)}">${escapeHtml(s)}</button>
+        `).join('')}
+      </div>
+    ` : ''}
+  `;
+}
+
+function bindScaffold() {
+  document.getElementById('scaffoldBar')?.addEventListener('click', e => {
+    const chip = e.target.closest('.scaffold-chip');
+    if (chip) {
+      scaffoldConceptId = (scaffoldConceptId === chip.dataset.concept) ? null : chip.dataset.concept;
+      renderScaffold();
+      return;
+    }
+    const start = e.target.closest('.start-chip');
+    if (start) {
+      const input = document.getElementById('questionInput');
+      if (!input) return;
+      const cur = input.value.trim();
+      input.value = cur ? cur + ' ' + start.dataset.text : start.dataset.text;
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+      const btn = document.getElementById('btnAddQuestion');
+      if (btn) btn.disabled = input.value.trim().length === 0;
+    }
+  });
 }
 
 // 미분류 영역 + 7개 개념 컬럼 + 메타 패널만 다시 그림 (입력란은 유지)
@@ -440,32 +475,6 @@ function addAndRenderQuestion() {
   renderClassifyArea();
   updatePhaseBadges();
   input.focus();
-}
-
-// ── 질문 시작어 아코디언 ──────────────────────────────
-function bindStartsAccordion() {
-  document.getElementById('startsAccordion')?.addEventListener('click', e => {
-    const header = e.target.closest('.accordion-header');
-    const chip = e.target.closest('.start-chip');
-
-    if (header) {
-      const item = header.closest('.accordion-item');
-      const isOpen = item.classList.contains('open');
-      document.querySelectorAll('.accordion-item.open').forEach(el => el.classList.remove('open'));
-      if (!isOpen) item.classList.add('open');
-    }
-
-    if (chip) {
-      const input = document.getElementById('questionInput');
-      if (!input) return;
-      const cur = input.value.trim();
-      input.value = cur ? cur + ' ' + chip.dataset.text : chip.dataset.text;
-      input.focus();
-      input.setSelectionRange(input.value.length, input.value.length);
-      const btn = document.getElementById('btnAddQuestion');
-      if (btn) btn.disabled = input.value.trim().length === 0;
-    }
-  });
 }
 
 // ── 카드 클릭 이벤트 (미분류 펼침 + 분류 카드 버튼) ──
