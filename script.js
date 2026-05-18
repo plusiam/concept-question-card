@@ -1,4 +1,4 @@
-// concept-question-card V1 — 상태 관리, 질문 생성·분류 통합 보드, 탐구 라인 (3단계 구조)
+// concept-question-card V1 — 상태 관리, 질문 생성·분류 통합 보드, 탐구 목록 (3단계 구조)
 
 const STORAGE_KEY = 'cqc_v1';
 
@@ -91,7 +91,7 @@ function removeConceptFromQuestion(id, conceptId) {
   saveState();
 }
 
-// 별표(탐구 라인 선택) 토글
+// 별표(탐구 목록 선택) 토글
 function toggleStar(id) {
   const q = state.questions.find(q => q.id === id);
   if (q) { q.starred = !q.starred; saveState(); }
@@ -638,7 +638,7 @@ function updateMetaPanel(concepts) {
   panel.style.display = 'flex';
 }
 
-// ── 3단계: 탐구 라인 렌더링 ──────────────────────────
+// ── 3단계: 탐구 목록 렌더링 ──────────────────────────
 function renderInquiry() {
   const panel = document.getElementById('panel2');
   if (!panel) return;
@@ -658,7 +658,7 @@ function renderInquiry() {
           ${questions.map(q => `
             <div class="phase3-q-item${q.starred ? ' starred' : ''}" data-id="${q.id}">
               <button class="star-btn${q.starred ? ' on' : ''}" data-id="${q.id}"
-                title="${q.starred ? '별표 해제' : '탐구 라인으로 선택'}">
+                title="${q.starred ? '별표 해제' : '탐구 목록으로 선택'}">
                 ${q.starred ? '★' : '☆'}
               </button>
               <span class="phase3-q-text">${escapeHtml(q.text)}</span>
@@ -685,20 +685,20 @@ function renderInquiry() {
     <div class="phase3-layout">
       <div class="phase3-main">
         <div class="phase3-header">
-          <div class="phase3-title">🎯 탐구 라인 선택</div>
+          <div class="phase3-title">🎯 탐구 목록 선택</div>
           <div class="phase3-desc">함께 탐구할 질문에 별표(★)를 눌러요. 개념별로 대표 질문을 고르면 탐구 길이 만들어져요.</div>
         </div>
         <div class="phase3-groups" id="phase3Groups">
-          ${conceptSections || '<div class="list-empty">질문을 개념으로 분류한 뒤 여기서 탐구 라인을 골라요.</div>'}
+          ${conceptSections || '<div class="list-empty">질문을 개념으로 분류한 뒤 여기서 탐구 목록을 골라요.</div>'}
         </div>
       </div>
       <div class="phase3-sidebar">
         <div class="loi-header">
-          <span>📌 탐구 라인 (Lines of Inquiry)</span>
+          <span>📌 탐구 목록 (Lines of Inquiry)</span>
           ${starredCount > 0 ? `<span class="count-badge">${starredCount}</span>` : ''}
         </div>
         <div class="loi-board">
-          ${loiItems || '<div class="loi-empty">⭐ 왼쪽에서 질문에 별표를 눌러<br>탐구 라인을 선택해 보세요.</div>'}
+          ${loiItems || '<div class="loi-empty">⭐ 왼쪽에서 질문에 별표를 눌러<br>탐구 목록을 선택해 보세요.</div>'}
         </div>
       </div>
     </div>
