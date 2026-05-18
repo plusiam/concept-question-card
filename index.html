@@ -1,0 +1,112 @@
+<!-- concept-question-card V1 — 탐구 주제 중심 개념 질문 분류 보드 (5-6학년) -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>개념 질문 카드 — IB PYP 탐구 질문 만들기</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app-wrapper">
+
+  <!-- 상단 헤더 -->
+  <header class="app-header">
+    <div class="header-meta">
+      <div class="header-topic-row">
+        <span class="header-topic-prefix">🔍</span>
+        <div
+          class="header-topic"
+          id="headerTopic"
+          contenteditable="true"
+          spellcheck="false"
+          data-placeholder="오늘의 주제를 입력하세요 (예: 놀이터)"
+        ></div>
+      </div>
+      <div
+        class="header-context"
+        id="headerContext"
+        contenteditable="true"
+        spellcheck="false"
+        data-placeholder="수업 맥락 메모 (선택)"
+      ></div>
+    </div>
+    <span class="autosave-badge" id="autosaveBadge">💾 자동저장</span>
+    <button class="btn-settings" id="btnSettings">⚙️ 설정</button>
+  </header>
+
+  <!-- Phase 탭 네비게이션 -->
+  <nav class="phase-nav" id="phaseNav">
+    <button class="phase-tab" data-phase="0">
+      🌱 단어 시드
+      <span class="phase-badge" id="badge0">Phase 0</span>
+    </button>
+    <button class="phase-tab" data-phase="1">
+      ✏️ 질문 만들기
+      <span class="phase-badge" id="badge1">Phase 1</span>
+    </button>
+    <button class="phase-tab active" data-phase="2">
+      🗂️ 개념 분류
+      <span class="phase-badge" id="badge2">Phase 2</span>
+    </button>
+    <button class="phase-tab" data-phase="3">
+      🎯 탐구 라인
+      <span class="phase-badge" id="badge3">Phase 3</span>
+    </button>
+  </nav>
+
+  <!-- 메인 콘텐츠 -->
+  <main class="app-main">
+
+    <!-- Phase 0: 단어 시드 풀 -->
+    <section class="phase-panel" id="panel0">
+      <!-- JS renderPhase0()로 렌더링 -->
+    </section>
+
+    <!-- Phase 1: 질문 만들기 -->
+    <section class="phase-panel" id="panel1">
+      <!-- JS renderPhase1()로 렌더링 -->
+    </section>
+
+    <!-- Phase 2: 개념 분류 보드 -->
+    <section class="phase-panel active" id="panel2">
+      <div class="concept-board" id="conceptBoard"></div>
+      <div class="meta-panel" id="metaPanel" style="display:none">
+        <span class="meta-icon">💬</span>
+        <span id="metaPanelText"></span>
+      </div>
+    </section>
+
+    <!-- Phase 3: 탐구 라인 합의 -->
+    <section class="phase-panel" id="panel3">
+      <!-- JS renderPhase3()로 렌더링 -->
+    </section>
+
+  </main>
+</div>
+
+<!-- 개념 컬럼 설정 모달 -->
+<div class="modal-overlay hidden" id="modalOverlay">
+  <div class="modal-box modal-box-sm">
+    <div>
+      <div class="modal-title">⚙️ 개념 컬럼 설정</div>
+      <div class="modal-subtitle">표시할 개념을 고르세요. 비워두면 7개 전체 표시.</div>
+    </div>
+    <div class="form-group">
+      <div class="concept-check-grid" id="conceptCheckGrid"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btnModalCancel">닫기</button>
+      <button class="btn btn-primary" id="btnModalSave">저장하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- SortableJS CDN -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script src="data.js"></script>
+<script src="config.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
