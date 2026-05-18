@@ -486,9 +486,11 @@ body {
   .app-main { padding: 12px; }
 
   .concept-board {
-    grid-template-columns: repeat(7, 145px);
-    gap: 8px;
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
+  .concept-col { min-height: auto; }
+  .col-cards { min-height: 48px; }
 }
 
 /* ── 질문 카드 (Phase 2) ── */
@@ -546,11 +548,16 @@ body {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--color-text-sub);
-  padding: 2px 4px;
-  border-radius: 4px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 4px;
+  border-radius: 6px;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: background 0.1s, color 0.1s;
   flex-shrink: 0;
 }
@@ -729,16 +736,10 @@ body {
 }
 
 .unclassified-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
   min-height: 44px;
-}
-
-.unclassified-list .q-card {
-  width: calc(50% - 4px);
-  min-width: 180px;
-  cursor: grab;
 }
 
 .list-empty {
@@ -1221,6 +1222,76 @@ body {
 @media (max-width: 768px) {
   .phase3-layout { grid-template-columns: 1fr; }
   .phase3-sidebar { position: static; }
+}
+
+/* ── 통합 보드 페이지 (질문 만들기 + 분류) ── */
+.board-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.make-row {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 16px;
+  align-items: start;
+}
+
+/* 미분류 카드 — 클릭하면 개념 버튼 펼침 */
+.unclassified-card {
+  cursor: pointer;
+}
+
+.unclassified-card.expanded {
+  grid-column: 1 / -1;
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-primary);
+}
+
+.card-tap-hint {
+  font-size: 11px;
+  color: var(--color-text-sub);
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+/* 인라인 개념 선택 */
+.inline-picker {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--color-border);
+}
+
+.inline-picker-hint {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-sub);
+  margin-bottom: 6px;
+}
+
+.inline-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 6px;
+}
+
+.concept-pick-btn {
+  border: 1.5px solid;
+  border-radius: 8px;
+  padding: 8px 6px;
+  font-family: var(--font-main);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 40px;
+  transition: transform 0.1s, opacity 0.1s;
+}
+.concept-pick-btn:hover { transform: scale(1.04); opacity: 0.9; }
+.concept-pick-btn:active { transform: scale(0.98); }
+
+@media (max-width: 768px) {
+  .make-row { grid-template-columns: 1fr; }
 }
 
 /* ── 인쇄 (M5에서 채움) ── */

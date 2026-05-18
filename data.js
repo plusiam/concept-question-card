@@ -1,4 +1,4 @@
-// IB PYP 7개 핵심 개념 데이터 및 단원 메타 기본값
+// IB PYP 7개 핵심 개념 데이터 및 주제 메타 기본값
 
 const KEY_CONCEPTS = [
   {
