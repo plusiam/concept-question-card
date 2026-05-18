@@ -772,9 +772,10 @@ function updateHeader() {
   if (contextEl) contextEl.textContent = state.unitMeta.centralIdea || '';
 }
 
-// ── 개념 컬럼 설정 모달 ───────────────────────────────
+// ── 설정 모달 ─────────────────────────────────────────
 function openModal() {
   document.getElementById('modalOverlay').classList.remove('hidden');
+  document.getElementById('inputGroupName').value = state.unitMeta.groupName || '';
   document.querySelectorAll('.concept-check-item input').forEach(cb => {
     cb.checked = state.unitMeta.enabledConcepts
       ? state.unitMeta.enabledConcepts.includes(cb.dataset.conceptId)
@@ -787,6 +788,7 @@ function closeModal() {
 }
 
 function saveModal() {
+  state.unitMeta.groupName = document.getElementById('inputGroupName').value.trim();
   const checked = [...document.querySelectorAll('.concept-check-item input:checked')]
     .map(cb => cb.dataset.conceptId);
   state.unitMeta.enabledConcepts = checked.length > 0 ? checked : null;
@@ -794,6 +796,62 @@ function saveModal() {
   closeModal();
   const tab = document.querySelector('.phase-tab.active');
   switchPhase(tab ? parseInt(tab.dataset.phase) : 1);
+}
+
+// ── JSON 내보내기 / 불러오기 ──────────────────────────
+function exportJSON() {
+  const data = {
+    app: 'concept-question-card',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    unitMeta: state.unitMeta,
+    questions: state.questions,
+    seeds: state.seeds
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const namePart = [state.unitMeta.unitTitle, state.unitMeta.groupName]
+    .map(s => (s || '').trim())
+    .filter(Boolean)
+    .join('_')
+    .replace(/[\/\\:*?"<>|]/g, '-') || '개념질문카드';
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${namePart}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importJSON(file) {
+  if (state.questions.length > 0 || state.seeds.length > 0) {
+    if (!confirm('지금 화면의 질문과 단어가 불러온 파일 내용으로 모두 바뀝니다. 계속할까요?')) return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try {
+      data = JSON.parse(reader.result);
+    } catch (e) {
+      alert('파일을 읽을 수 없어요. 올바른 JSON 파일인지 확인해 주세요.');
+      return;
+    }
+    if (!data || data.app !== 'concept-question-card') {
+      alert('이 도구에서 내보낸 질문 카드 파일이 아니에요.');
+      return;
+    }
+    state.unitMeta = { ...UNIT_META_DEFAULT, ...(data.unitMeta || {}) };
+    state.questions = Array.isArray(data.questions) ? data.questions : [];
+    state.seeds = Array.isArray(data.seeds) ? data.seeds : [];
+    expandedCardId = null;
+    scaffoldConceptId = null;
+    saveState();
+    updateHeader();
+    switchPhase(1);
+    updatePhaseBadges();
+  };
+  reader.readAsText(file);
 }
 
 // ── 개념 체크박스 렌더링 ──────────────────────────────
@@ -825,6 +883,15 @@ function bindEvents() {
   });
 
   document.getElementById('btnSettings').addEventListener('click', openModal);
+  document.getElementById('btnExport').addEventListener('click', exportJSON);
+  document.getElementById('btnImport').addEventListener('click', () => {
+    document.getElementById('fileImport').click();
+  });
+  document.getElementById('fileImport').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) importJSON(file);
+    e.target.value = '';
+  });
   document.getElementById('btnModalCancel').addEventListener('click', closeModal);
   document.getElementById('btnModalSave').addEventListener('click', saveModal);
   document.getElementById('modalOverlay').addEventListener('click', e => {

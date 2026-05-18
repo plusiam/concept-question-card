@@ -32,8 +32,13 @@
         data-placeholder="수업 맥락 메모 (선택)"
       ></div>
     </div>
-    <span class="autosave-badge" id="autosaveBadge">💾 자동저장</span>
-    <button class="btn-settings" id="btnSettings">⚙️ 설정</button>
+    <div class="header-actions">
+      <span class="autosave-badge" id="autosaveBadge">💾 자동저장</span>
+      <button class="btn-settings" id="btnImport">📥 불러오기</button>
+      <button class="btn-settings" id="btnExport">📤 내보내기</button>
+      <button class="btn-settings" id="btnSettings">⚙️ 설정</button>
+    </div>
+    <input type="file" id="fileImport" accept="application/json,.json" hidden>
   </header>
 
   <!-- 단계 탭 네비게이션 -->
@@ -77,10 +82,25 @@
 <div class="modal-overlay hidden" id="modalOverlay">
   <div class="modal-box modal-box-sm">
     <div>
-      <div class="modal-title">⚙️ 개념 컬럼 설정</div>
-      <div class="modal-subtitle">표시할 개념을 고르세요. 비워두면 7개 전체 표시.</div>
+      <div class="modal-title">⚙️ 설정</div>
+      <div class="modal-subtitle">학생·모둠 이름과 표시할 개념을 정해요.</div>
     </div>
     <div class="form-group">
+      <label class="form-label" for="inputGroupName">
+        학생 / 모둠 이름 <span class="optional">선택</span>
+      </label>
+      <input
+        class="form-input"
+        id="inputGroupName"
+        type="text"
+        placeholder="예: 한지우 / 1모둠"
+        maxlength="30"
+      >
+    </div>
+    <div class="form-group">
+      <label class="form-label">
+        개념 컬럼 <span class="optional">비워두면 7개 전체 표시</span>
+      </label>
       <div class="concept-check-grid" id="conceptCheckGrid"></div>
     </div>
     <div class="modal-actions">

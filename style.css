@@ -469,6 +469,16 @@ body {
 .phase-placeholder .placeholder-icon { font-size: 48px; }
 .phase-placeholder p { font-size: 15px; }
 
+/* ── 헤더 우측 액션 영역 ── */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 /* ── 자동 저장 뱃지 ── */
 .autosave-badge {
   font-size: 11px;
@@ -481,7 +491,9 @@ body {
 
 /* ── 반응형 (모바일 375px) ── */
 @media (max-width: 768px) {
-  .app-header { padding: 12px 14px; }
+  .app-header { padding: 12px 14px; flex-wrap: wrap; }
+  .header-actions { width: 100%; }
+  .btn-settings { padding: 5px 10px; font-size: 12px; }
   .phase-tab { padding: 10px 12px; font-size: 12px; }
   .app-main { padding: 12px; }
 

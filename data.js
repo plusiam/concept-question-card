@@ -97,6 +97,7 @@ const KEY_CONCEPTS = [
 const UNIT_META_DEFAULT = {
   unitTitle: '',
   centralIdea: '',
+  groupName: '',
   enabledConcepts: null,
   seedWords: [],
   grade: '5-6'
