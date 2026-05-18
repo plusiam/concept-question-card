@@ -71,6 +71,14 @@ function deleteQuestion(id) {
   saveState();
 }
 
+// 질문 글 수정 (빈 값이면 기존 글 유지)
+function updateQuestionText(id, newText) {
+  const q = state.questions.find(q => q.id === id);
+  if (!q) return;
+  const t = newText.trim();
+  if (t) { q.text = t; saveState(); }
+}
+
 // 다중 분류 추가 (최대 3개)
 function addConceptToQuestion(id, conceptId) {
   const q = state.questions.find(q => q.id === id);
@@ -379,9 +387,11 @@ function renderQuestionCard(q, concept) {
     const concepts = getActiveConcepts();
     return `
       <div class="q-card unclassified-card${expanded ? ' expanded' : ''}" data-id="${q.id}">
-        <div class="q-card-text">${escapeHtml(q.text)}</div>
+        ${expanded
+          ? `<textarea class="q-card-edit" data-id="${q.id}" rows="2" maxlength="120">${escapeHtml(q.text)}</textarea>`
+          : `<div class="q-card-text">${escapeHtml(q.text)}</div>`}
         <div class="q-card-footer">
-          <span></span>
+          ${expanded ? '<span class="edit-hint">✏️ 위 칸에서 질문을 고칠 수 있어요</span>' : '<span></span>'}
           <button class="btn-icon btn-delete-card" data-id="${q.id}" title="질문 삭제">✕</button>
         </div>
         ${expanded
@@ -506,6 +516,8 @@ function bindClassifyEvents() {
       openConceptPicker(addConc.dataset.id, addConc);
       return;
     }
+    // 편집 칸 클릭은 펼치기 토글하지 않음 (글 수정 중)
+    if (e.target.closest('.q-card-edit')) return;
     // 미분류 카드 본문 클릭 → 개념 버튼 펼치기 토글
     const unCard = e.target.closest('.unclassified-card');
     if (unCard) {
@@ -513,6 +525,21 @@ function bindClassifyEvents() {
       expandedCardId = (expandedCardId === id) ? null : id;
       renderClassifyArea();
       return;
+    }
+  });
+
+  // 질문 글 수정 저장 (편집 칸 blur)
+  host.addEventListener('blur', e => {
+    const ta = e.target.closest('.q-card-edit');
+    if (ta) updateQuestionText(ta.dataset.id, ta.value);
+  }, true);
+
+  // Enter로 수정 마치기 (Shift+Enter는 줄바꿈)
+  host.addEventListener('keydown', e => {
+    const ta = e.target.closest('.q-card-edit');
+    if (ta && e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      ta.blur();
     }
   });
 }
@@ -526,6 +553,8 @@ function initSortable() {
     el._sortable = Sortable.create(el, {
       group: 'questions',
       animation: 150,
+      filter: '.q-card-edit',
+      preventOnFilter: false,
       ghostClass: 'sortable-ghost',
       dragClass: 'sortable-drag',
       onEnd(evt) {
