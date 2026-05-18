@@ -824,10 +824,14 @@ function exportJSON() {
   URL.revokeObjectURL(url);
 }
 
-// ── 현재 단계 인쇄 / PDF ──────────────────────────────
-function doPrint() {
-  const tab = document.querySelector('.phase-tab.active');
-  const phase = tab ? parseInt(tab.dataset.phase) : 1;
+// ── 단계 인쇄 / PDF ───────────────────────────────────
+function doPrint(phase) {
+  if (typeof phase !== 'number') {
+    const tab = document.querySelector('.phase-tab.active');
+    phase = tab ? parseInt(tab.dataset.phase) : 1;
+  }
+  // 해당 단계로 전환해 패널을 렌더한 뒤 인쇄
+  switchPhase(phase);
   const stepNames = ['1단계 단어 모으기', '2단계 질문과 분류', '3단계 탐구 목록'];
 
   const ph = document.getElementById('printHeader');
@@ -852,6 +856,15 @@ function doPrint() {
   orient.textContent = `@page { size: A4 ${phase === 1 ? 'landscape' : 'portrait'}; margin: 12mm; }`;
 
   window.print();
+}
+
+// ── 내보내기 모달 ─────────────────────────────────────
+function openExportModal() {
+  document.getElementById('exportModal').classList.remove('hidden');
+}
+
+function closeExportModal() {
+  document.getElementById('exportModal').classList.add('hidden');
 }
 
 function importJSON(file) {
@@ -913,8 +926,7 @@ function bindEvents() {
   });
 
   document.getElementById('btnSettings').addEventListener('click', openModal);
-  document.getElementById('btnPrint').addEventListener('click', doPrint);
-  document.getElementById('btnExport').addEventListener('click', exportJSON);
+  document.getElementById('btnExport').addEventListener('click', openExportModal);
   document.getElementById('btnImport').addEventListener('click', () => {
     document.getElementById('fileImport').click();
   });
@@ -923,6 +935,22 @@ function bindEvents() {
     if (file) importJSON(file);
     e.target.value = '';
   });
+
+  document.getElementById('btnExportCancel').addEventListener('click', closeExportModal);
+  document.getElementById('exportModal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeExportModal();
+  });
+  document.getElementById('exportOptions').addEventListener('click', e => {
+    const opt = e.target.closest('.export-option');
+    if (!opt) return;
+    closeExportModal();
+    if (opt.dataset.action === 'print') {
+      doPrint(parseInt(opt.dataset.phase));
+    } else if (opt.dataset.action === 'json') {
+      exportJSON();
+    }
+  });
+
   document.getElementById('btnModalCancel').addEventListener('click', closeModal);
   document.getElementById('btnModalSave').addEventListener('click', saveModal);
   document.getElementById('modalOverlay').addEventListener('click', e => {
