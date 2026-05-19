@@ -592,13 +592,17 @@ function renderQuestionCard(q, concept) {
     ? `<button class="btn-icon btn-remove-concept" data-id="${q.id}" data-concept="${concept.id}" title="이 개념에서 빼기">✕</button>`
     : `<button class="btn-icon btn-delete-card" data-id="${q.id}" title="질문 삭제">✕</button>`;
 
+  const expanded = q.id === expandedCardId;
+
   return `
-    <div class="q-card" data-id="${q.id}" style="border-color:${concept.palette.accent}">
+    <div class="q-card${expanded ? ' expanded' : ''}" data-id="${q.id}" style="border-color:${concept.palette.accent}">
       ${otherConcepts.length > 0 ? `<div class="concept-dots">${dotHtml}</div>` : ''}
-      <div class="q-card-text">${escapeHtml(q.text)}</div>
+      ${expanded
+        ? `<textarea class="q-card-edit" data-id="${q.id}" rows="2" maxlength="120">${escapeHtml(q.text)}</textarea>`
+        : `<div class="q-card-text" title="클릭하면 질문 글을 고칠 수 있어요">${escapeHtml(q.text)}</div>`}
       ${renderOriginChip(q)}
       <div class="q-card-footer">
-        <span></span>
+        ${expanded ? '<span class="edit-hint">✏️ 수정 중</span>' : '<span></span>'}
         <div class="q-card-actions">
           ${addBtnHtml}
           ${removeBtnHtml}
@@ -689,6 +693,17 @@ function bindClassifyEvents() {
       expandedCardId = (expandedCardId === id) ? null : id;
       renderClassifyArea();
       return;
+    }
+    // 분류된 카드 글 클릭 → 글 수정 모드 토글
+    const qText = e.target.closest('.q-card-text');
+    if (qText) {
+      const card = qText.closest('.q-card');
+      if (card && !card.classList.contains('unclassified-card')) {
+        const id = card.dataset.id;
+        expandedCardId = (expandedCardId === id) ? null : id;
+        renderClassifyArea();
+        return;
+      }
     }
   });
 

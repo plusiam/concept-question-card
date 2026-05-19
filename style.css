@@ -566,6 +566,12 @@ body {
   line-height: 1.5;
   color: var(--color-text);
   word-break: keep-all;
+  cursor: pointer;
+}
+
+.q-card.expanded {
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-primary) !important;
 }
 
 .q-card-footer {
