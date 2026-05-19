@@ -6,7 +6,8 @@ const STORAGE_KEY = 'cqc_v1';
 let state = {
   unitMeta: { ...UNIT_META_DEFAULT },
   questions: [],
-  seeds: []
+  seeds: [],
+  clusters: []
 };
 
 // 현재 인라인으로 펼쳐진 미분류 카드 id
@@ -21,7 +22,8 @@ function saveState() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       unitMeta: state.unitMeta,
       questions: state.questions,
-      seeds: state.seeds
+      seeds: state.seeds,
+      clusters: state.clusters
     }));
     flashAutosave();
   } catch (e) { /* 저장 실패 무시 */ }
@@ -35,6 +37,7 @@ function loadState() {
     if (saved.unitMeta) state.unitMeta = { ...UNIT_META_DEFAULT, ...saved.unitMeta };
     if (Array.isArray(saved.questions)) state.questions = saved.questions;
     if (Array.isArray(saved.seeds)) state.seeds = saved.seeds;
+    if (Array.isArray(saved.clusters)) state.clusters = saved.clusters;
   } catch (e) {
     localStorage.removeItem(STORAGE_KEY);
   }
@@ -124,6 +127,9 @@ function addSeed(text) {
 
 function deleteSeed(id) {
   state.seeds = state.seeds.filter(s => s.id !== id);
+  state.clusters.forEach(cl => {
+    cl.seedIds = cl.seedIds.filter(sid => sid !== id);
+  });
   saveState();
 }
 
@@ -132,12 +138,57 @@ function markSeedConverted(id) {
   if (seed) { seed.converted = true; saveState(); }
 }
 
+// ── 1단계: 단어 묶음(클러스터) CRUD ───────────────────
+function generateClusterId() {
+  return 'cl_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+}
+
+function addCluster() {
+  const cluster = { id: generateClusterId(), title: '', seedIds: [] };
+  state.clusters.push(cluster);
+  saveState();
+  return cluster;
+}
+
+function deleteCluster(id) {
+  // 묶음만 제거하고 단어는 보존 → 미분류 풀로 복귀
+  state.clusters = state.clusters.filter(cl => cl.id !== id);
+  saveState();
+}
+
+function updateClusterTitle(id, title) {
+  const cl = state.clusters.find(cl => cl.id === id);
+  if (!cl) return;
+  cl.title = (title || '').trim().slice(0, 30);
+  saveState();
+}
+
+// 단어를 특정 묶음으로 이동 (clusterId가 비면 미분류로)
+function moveSeedToCluster(seedId, clusterId) {
+  state.clusters.forEach(cl => {
+    cl.seedIds = cl.seedIds.filter(sid => sid !== seedId);
+  });
+  if (clusterId) {
+    const target = state.clusters.find(cl => cl.id === clusterId);
+    if (target && !target.seedIds.includes(seedId)) target.seedIds.push(seedId);
+  }
+  saveState();
+}
+
+// 어느 묶음에도 속하지 않은 단어
+function getUnclusteredSeeds() {
+  const claimed = new Set();
+  state.clusters.forEach(cl => cl.seedIds.forEach(sid => claimed.add(sid)));
+  return state.seeds.filter(s => !claimed.has(s.id));
+}
+
 // ── 1단계: 단어 모으기 렌더링 ─────────────────────────
 function renderPhase0() {
   const panel = document.getElementById('panel0');
   if (!panel) return;
   const seedCount = state.seeds.length;
   const convertedCount = state.seeds.filter(s => s.converted).length;
+  const unclustered = getUnclusteredSeeds();
 
   panel.innerHTML = `
     <div class="phase0-layout">
@@ -153,7 +204,10 @@ function renderPhase0() {
           >
           <button class="btn btn-primary btn-add" id="btnAddSeed" disabled>+ 추가</button>
         </div>
-        <div class="seed-hint">단어 카드를 클릭하면 '질문과 분류'로 이동해 질문을 바로 만들 수 있어요.</div>
+        <div class="seed-hint">
+          단어 카드를 클릭하면 '질문과 분류'로 이동해 질문을 만들 수 있어요.
+          비슷한 단어는 아래에서 끌어다 묶어 보세요. (선택)
+        </div>
       </div>
       <div class="seed-stats">
         <span class="count-badge">${seedCount}</span>개의 단어
@@ -161,15 +215,64 @@ function renderPhase0() {
           ? `<span class="seed-converted-count">· ${convertedCount}개 질문으로 변환됨</span>`
           : ''}
       </div>
-      <div class="seed-pool" id="seedPool">
-        ${seedCount === 0
-          ? '<div class="seed-empty">아직 단어가 없어요. 위에서 첫 번째 단어를 추가해 보세요!</div>'
-          : state.seeds.map(s => renderSeedCard(s)).join('')}
+      <div class="seed-board" id="seedBoard">
+        <div class="seed-cluster seed-cluster-unsorted">
+          <div class="seed-cluster-head">
+            <span class="seed-cluster-label">📋 미분류</span>
+            <span class="seed-cluster-count">${unclustered.length}개</span>
+          </div>
+          <div class="seed-pool seed-sortable-list" data-cluster="">
+            ${seedCount === 0
+              ? '<div class="seed-empty">아직 단어가 없어요. 위에서 첫 번째 단어를 추가해 보세요!</div>'
+              : (unclustered.length === 0
+                  ? '<div class="seed-empty">모든 단어를 묶었어요!</div>'
+                  : unclustered.map(s => renderSeedCard(s)).join(''))}
+          </div>
+        </div>
+        ${state.clusters.map(cl => renderCluster(cl)).join('')}
+        ${seedCount > 0
+          ? '<button class="btn-add-cluster" id="btnAddCluster">＋ 새 묶음 만들기</button>'
+          : ''}
       </div>
     </div>
   `;
 
   bindPhase0Events();
+  initSeedSortable();
+}
+
+function renderCluster(cluster) {
+  const seeds = cluster.seedIds
+    .map(sid => state.seeds.find(s => s.id === sid))
+    .filter(Boolean);
+  const chips = KEY_CONCEPTS
+    .map(c => `<button class="seed-concept-chip" data-cluster="${cluster.id}" data-name="${escapeHtml(c.name)}">${c.icon} ${c.name}</button>`)
+    .join('');
+  return `
+    <div class="seed-cluster" data-cluster="${cluster.id}">
+      <div class="seed-cluster-head">
+        <input
+          class="seed-cluster-title"
+          data-cluster="${cluster.id}"
+          type="text"
+          maxlength="30"
+          placeholder="묶음 이름을 지어요 (예: 무서운 것)"
+          value="${escapeHtml(cluster.title)}"
+        >
+        <span class="seed-cluster-count">${seeds.length}개</span>
+        <button class="btn-cluster-delete" data-cluster="${cluster.id}" title="묶음 풀기 (단어는 미분류로 돌아가요)">✕</button>
+      </div>
+      <div class="seed-cluster-chips">
+        <span class="seed-chip-label">추천</span>
+        ${chips}
+      </div>
+      <div class="seed-pool seed-sortable-list" data-cluster="${cluster.id}">
+        ${seeds.length === 0
+          ? '<div class="seed-empty">여기로 단어를 끌어다 놓아요</div>'
+          : seeds.map(s => renderSeedCard(s)).join('')}
+      </div>
+    </div>
+  `;
 }
 
 function renderSeedCard(seed) {
@@ -185,24 +288,47 @@ function renderSeedCard(seed) {
 function bindPhase0Events() {
   const input = document.getElementById('seedInput');
   const btn = document.getElementById('btnAddSeed');
-  if (!input || !btn) return;
+  if (input && btn) {
+    input.addEventListener('input', () => {
+      btn.disabled = input.value.trim().length === 0;
+    });
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !btn.disabled) addSeedAndRender();
+    });
+    btn.addEventListener('click', addSeedAndRender);
+  }
 
-  input.addEventListener('input', () => {
-    btn.disabled = input.value.trim().length === 0;
-  });
+  const board = document.getElementById('seedBoard');
+  if (!board) return;
 
-  input.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !btn.disabled) addSeedAndRender();
-  });
-
-  btn.addEventListener('click', addSeedAndRender);
-
-  document.getElementById('seedPool')?.addEventListener('click', e => {
-    const del = e.target.closest('.btn-seed-delete');
-    if (del) {
-      deleteSeed(del.dataset.id);
+  board.addEventListener('click', e => {
+    const seedDel = e.target.closest('.btn-seed-delete');
+    if (seedDel) {
+      deleteSeed(seedDel.dataset.id);
       renderPhase0();
       updatePhaseBadges();
+      return;
+    }
+    const clusterDel = e.target.closest('.btn-cluster-delete');
+    if (clusterDel) {
+      deleteCluster(clusterDel.dataset.cluster);
+      renderPhase0();
+      return;
+    }
+    const chip = e.target.closest('.seed-concept-chip');
+    if (chip) {
+      const titleInput = board.querySelector(
+        `.seed-cluster-title[data-cluster="${chip.dataset.cluster}"]`
+      );
+      if (titleInput) {
+        titleInput.value = chip.dataset.name;
+        updateClusterTitle(chip.dataset.cluster, chip.dataset.name);
+      }
+      return;
+    }
+    if (e.target.closest('#btnAddCluster')) {
+      addCluster();
+      renderPhase0();
       return;
     }
     const card = e.target.closest('.seed-card');
@@ -222,6 +348,43 @@ function bindPhase0Events() {
         }
       }, 50);
     }
+  });
+
+  // 묶음 제목 — 재렌더 없이 blur 시점에 저장 (포커스 유지)
+  board.addEventListener('focusout', e => {
+    const title = e.target.closest('.seed-cluster-title');
+    if (title) updateClusterTitle(title.dataset.cluster, title.value);
+  });
+  board.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.closest('.seed-cluster-title')) {
+      e.preventDefault();
+      e.target.blur();
+    }
+  });
+}
+
+// 미분류 풀 + 묶음 사이 단어 드래그 이동
+function initSeedSortable() {
+  if (typeof Sortable === 'undefined') return;
+  document.querySelectorAll('.seed-sortable-list').forEach(el => {
+    if (el._sortable) el._sortable.destroy();
+    el._sortable = Sortable.create(el, {
+      group: 'seeds',
+      animation: 150,
+      filter: '.btn-seed-delete',
+      preventOnFilter: false,
+      ghostClass: 'sortable-ghost',
+      dragClass: 'sortable-drag',
+      onEnd(evt) {
+        const fromCluster = evt.from.dataset.cluster || '';
+        const toCluster = evt.to.dataset.cluster || '';
+        if (fromCluster === toCluster) return; // 같은 묶음 내 정렬 — 무시
+        const seedId = evt.item.dataset.id;
+        if (!seedId) return;
+        moveSeedToCluster(seedId, toCluster);
+        renderPhase0();
+      }
+    });
   });
 }
 
@@ -824,7 +987,8 @@ function exportJSON() {
     exportedAt: new Date().toISOString(),
     unitMeta: state.unitMeta,
     questions: state.questions,
-    seeds: state.seeds
+    seeds: state.seeds,
+    clusters: state.clusters
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -905,6 +1069,7 @@ function importJSON(file) {
     state.unitMeta = { ...UNIT_META_DEFAULT, ...(data.unitMeta || {}) };
     state.questions = Array.isArray(data.questions) ? data.questions : [];
     state.seeds = Array.isArray(data.seeds) ? data.seeds : [];
+    state.clusters = Array.isArray(data.clusters) ? data.clusters : [];
     expandedCardId = null;
     scaffoldConceptId = null;
     saveState();
