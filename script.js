@@ -16,6 +16,9 @@ let expandedCardId = null;
 // 질문 시작어 비계에서 펼쳐진 개념 id
 let scaffoldConceptId = null;
 
+// 1단계 단어에서 넘어온 질문에 붙일 출처 개념어 (다음 질문 추가 시 1회 소비)
+let pendingOriginWord = '';
+
 // ── LocalStorage ───────────────────────────────────────
 function saveState() {
   try {
@@ -56,12 +59,13 @@ function generateId() {
   return 'q_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 }
 
-function addQuestion(text) {
+function addQuestion(text, originWord) {
   const q = {
     id: generateId(),
     text: text.trim(),
     conceptIds: [],
     starred: false,
+    originWord: (originWord || '').trim(),
     createdAt: new Date().toISOString()
   };
   state.questions.push(q);
@@ -321,6 +325,8 @@ function bindPhase0Events() {
     if (card) {
       const seed = state.seeds.find(s => s.id === card.dataset.id);
       if (!seed) return;
+      const cluster = state.clusters.find(cl => cl.seedIds.includes(seed.id));
+      pendingOriginWord = (cluster && cluster.title.trim()) ? cluster.title.trim() : '';
       markSeedConverted(seed.id);
       switchPhase(1);
       setTimeout(() => {
@@ -529,6 +535,12 @@ function renderClassifyArea() {
   updateMetaPanel(concepts);
 }
 
+// 1단계 개념어에서 비롯된 질문에 붙는 출처 태그
+function renderOriginChip(q) {
+  if (!q.originWord) return '';
+  return `<div class="q-origin-chip" title="1단계 개념어에서 시작한 질문이에요">🌱 ${escapeHtml(q.originWord)}</div>`;
+}
+
 function renderQuestionCard(q, concept) {
   // 미분류 카드 — 클릭하면 개념 버튼이 인라인으로 펼쳐짐
   if (!concept) {
@@ -539,6 +551,7 @@ function renderQuestionCard(q, concept) {
         ${expanded
           ? `<textarea class="q-card-edit" data-id="${q.id}" rows="2" maxlength="120">${escapeHtml(q.text)}</textarea>`
           : `<div class="q-card-text">${escapeHtml(q.text)}</div>`}
+        ${renderOriginChip(q)}
         <div class="q-card-footer">
           ${expanded ? '<span class="edit-hint">✏️ 위 칸에서 질문을 고칠 수 있어요</span>' : '<span></span>'}
           <button class="btn-icon btn-delete-card" data-id="${q.id}" title="질문 삭제">✕</button>
@@ -583,6 +596,7 @@ function renderQuestionCard(q, concept) {
     <div class="q-card" data-id="${q.id}" style="border-color:${concept.palette.accent}">
       ${otherConcepts.length > 0 ? `<div class="concept-dots">${dotHtml}</div>` : ''}
       <div class="q-card-text">${escapeHtml(q.text)}</div>
+      ${renderOriginChip(q)}
       <div class="q-card-footer">
         <span></span>
         <div class="q-card-actions">
@@ -618,7 +632,8 @@ function addAndRenderQuestion() {
   if (!input) return;
   const text = input.value.trim();
   if (!text) return;
-  addQuestion(text);
+  addQuestion(text, pendingOriginWord);
+  pendingOriginWord = '';
   input.value = '';
   const btn = document.getElementById('btnAddQuestion');
   if (btn) btn.disabled = true;

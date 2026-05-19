@@ -575,6 +575,19 @@ body {
   gap: 4px;
 }
 
+.q-origin-chip {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 600;
+  color: #92400E;
+  background: #FFFBEB;
+  border: 1px solid #FCD34D;
+  border-radius: 999px;
+  padding: 2px 8px;
+  word-break: keep-all;
+}
+
 .q-author-tag {
   font-size: 11px;
   background: rgba(0,0,0,0.05);
