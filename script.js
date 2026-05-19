@@ -930,6 +930,18 @@ function updatePhaseBadges() {
   setBadge('badge2', starred > 0 ? `${starred}개` : '');
 }
 
+// ── 단계별 사용 안내 ──────────────────────────────────
+const STEP_HELP = {
+  0: '주제를 보며 떠오르는 단어를 자유롭게 모아요. 비슷한 단어끼리 끌어다 한 묶음으로 만들고, 그 묶음을 아우르는 <strong>개념어</strong>를 한 단어로 붙여요. 단어 카드를 누르면 바로 2단계 질문으로 만들 수 있어요. (묶기는 안 해도 괜찮아요.)',
+  1: '궁금한 점을 질문으로 써요. <strong>질문 시작어 비계</strong>의 개념을 누르면 시작어가 나와 질문 만들기를 도와줘요. 만든 질문을 7개 핵심 개념 가운데 알맞은 곳으로 끌어다 분류해요. (질문 하나당 최대 3개, 질문 글을 누르면 고칠 수 있어요.)',
+  2: '2단계에서 만든 질문이 개념별로 모여 있어요. 함께 탐구하고 싶은 질문에 <strong>별표(★)</strong>를 눌러요. 별표한 질문이 오른쪽에 모이면 우리 반 탐구 질문이 완성돼요.'
+};
+
+function updateStepHelp(phaseNum) {
+  const body = document.getElementById('stepHelpBody');
+  if (body) body.innerHTML = STEP_HELP[phaseNum] || '';
+}
+
 // ── 단계 탭 전환 ─────────────────────────────────────
 function switchPhase(phaseNum) {
   document.querySelectorAll('.phase-tab').forEach(tab => {
@@ -941,6 +953,7 @@ function switchPhase(phaseNum) {
   if (phaseNum === 0) renderPhase0();
   if (phaseNum === 1) renderPhase1();
   if (phaseNum === 2) renderInquiry();
+  updateStepHelp(phaseNum);
 }
 
 // ── 헤더 인라인 편집 ──────────────────────────────────

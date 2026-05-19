@@ -249,6 +249,43 @@ body {
   overflow: hidden;
 }
 
+/* ── 단계별 사용 안내 (접이식) ── */
+.step-help {
+  margin: 12px 20px 0;
+  background: var(--color-primary-light);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.step-help-summary {
+  cursor: pointer;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  list-style: none;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.step-help-summary::-webkit-details-marker { display: none; }
+.step-help-summary::after {
+  content: '▾';
+  margin-left: auto;
+  color: var(--color-text-sub);
+  font-size: 11px;
+}
+.step-help[open] .step-help-summary::after { content: '▴'; }
+
+.step-help-body {
+  padding: 0 14px 12px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--color-text-sub);
+}
+.step-help-body strong { color: var(--color-text); }
+
 /* ── Phase 패널 (현재 M1: Phase 2만 실제 렌더) ── */
 .phase-panel { display: none; }
 .phase-panel.active { display: block; }
@@ -1566,6 +1603,7 @@ body {
   /* 화면 전용 요소 숨김 */
   .app-header,
   .phase-nav,
+  .step-help,
   .modal-overlay,
   .input-area,
   .scaffold-bar,
