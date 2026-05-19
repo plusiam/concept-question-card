@@ -455,6 +455,10 @@ function renderScaffold() {
       `).join('')}
     </div>
     ${selected ? `
+      <div class="scaffold-domains">
+        <span class="scaffold-domains-label">🔎 이런 걸 살펴봐요</span>
+        ${selected.domains.map(d => `<span class="domain-tag">${escapeHtml(d)}</span>`).join('')}
+      </div>
       <div class="scaffold-starts">
         ${selected.starts.map(s => `
           <button class="start-chip" data-text="${escapeHtml(s)}">${escapeHtml(s)}</button>
