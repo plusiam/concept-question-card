@@ -1096,6 +1096,22 @@ function importJSON(file) {
   reader.readAsText(file);
 }
 
+// ── 전체 초기화 (새로 시작) ───────────────────────────
+function resetAll() {
+  if (!confirm('모든 단어·묶음·질문·주제를 지우고 처음부터 새로 시작할까요? 이 동작은 되돌릴 수 없어요.')) return;
+  state.unitMeta = { ...UNIT_META_DEFAULT };
+  state.questions = [];
+  state.seeds = [];
+  state.clusters = [];
+  expandedCardId = null;
+  scaffoldConceptId = null;
+  pendingOriginWord = '';
+  saveState();
+  updateHeader();
+  switchPhase(0);
+  updatePhaseBadges();
+}
+
 // ── 개념 체크박스 렌더링 ──────────────────────────────
 function renderConceptCheckGrid() {
   const grid = document.getElementById('conceptCheckGrid');
@@ -1125,6 +1141,7 @@ function bindEvents() {
   });
 
   document.getElementById('btnSettings').addEventListener('click', openModal);
+  document.getElementById('btnReset').addEventListener('click', resetAll);
   document.getElementById('btnExport').addEventListener('click', openExportModal);
   document.getElementById('btnImport').addEventListener('click', () => {
     document.getElementById('fileImport').click();
