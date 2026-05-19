@@ -1082,6 +1082,29 @@ function closeExportModal() {
   document.getElementById('exportModal').classList.add('hidden');
 }
 
+// ── QR 코드 모달 ─────────────────────────────────────
+function openQrModal() {
+  const host = document.getElementById('qrImage');
+  const urlEl = document.getElementById('qrUrl');
+  const url = window.location.href;
+  if (urlEl) urlEl.textContent = url;
+  if (host) {
+    if (typeof qrcode === 'undefined') {
+      host.innerHTML = '<div class="qr-fallback">QR 코드를 불러오지 못했어요. 아래 주소를 직접 입력해 주세요.</div>';
+    } else {
+      const qr = qrcode(0, 'M');
+      qr.addData(url);
+      qr.make();
+      host.innerHTML = qr.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
+    }
+  }
+  document.getElementById('qrModal').classList.remove('hidden');
+}
+
+function closeQrModal() {
+  document.getElementById('qrModal').classList.add('hidden');
+}
+
 function importJSON(file) {
   if (state.questions.length > 0 || state.seeds.length > 0) {
     if (!confirm('지금 화면의 질문과 단어가 불러온 파일 내용으로 모두 바뀝니다. 계속할까요?')) return;
@@ -1159,6 +1182,11 @@ function bindEvents() {
 
   document.getElementById('btnSettings').addEventListener('click', openModal);
   document.getElementById('btnReset').addEventListener('click', resetAll);
+  document.getElementById('btnQr').addEventListener('click', openQrModal);
+  document.getElementById('btnQrClose').addEventListener('click', closeQrModal);
+  document.getElementById('qrModal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeQrModal();
+  });
   document.getElementById('btnExport').addEventListener('click', openExportModal);
   document.getElementById('btnImport').addEventListener('click', () => {
     document.getElementById('fileImport').click();
