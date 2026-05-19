@@ -205,8 +205,9 @@ function renderPhase0() {
           <button class="btn btn-primary btn-add" id="btnAddSeed" disabled>+ 추가</button>
         </div>
         <div class="seed-hint">
-          단어 카드를 클릭하면 '질문과 분류'로 이동해 질문을 만들 수 있어요.
-          비슷한 단어는 아래에서 끌어다 묶어 보세요. (선택)
+          주제에서 떠오르는 단어를 모아요. 비슷한 단어끼리 끌어다 묶고
+          그 묶음을 아우르는 <strong>개념어</strong>를 붙이면 2단계 질문의
+          출발점이 돼요. 단어 카드를 클릭하면 바로 질문으로 만들 수 있어요. (묶기는 선택)
         </div>
       </div>
       <div class="seed-stats">
@@ -245,9 +246,6 @@ function renderCluster(cluster) {
   const seeds = cluster.seedIds
     .map(sid => state.seeds.find(s => s.id === sid))
     .filter(Boolean);
-  const chips = KEY_CONCEPTS
-    .map(c => `<button class="seed-concept-chip" data-cluster="${cluster.id}" data-name="${escapeHtml(c.name)}">${c.icon} ${c.name}</button>`)
-    .join('');
   return `
     <div class="seed-cluster" data-cluster="${cluster.id}">
       <div class="seed-cluster-head">
@@ -256,16 +254,15 @@ function renderCluster(cluster) {
           data-cluster="${cluster.id}"
           type="text"
           maxlength="30"
-          placeholder="묶음 이름을 지어요 (예: 무서운 것)"
+          placeholder="이 묶음의 개념어 한 단어 (예: 안전 · 공정 · 협동)"
           value="${escapeHtml(cluster.title)}"
         >
         <span class="seed-cluster-count">${seeds.length}개</span>
         <button class="btn-cluster-delete" data-cluster="${cluster.id}" title="묶음 풀기 (단어는 미분류로 돌아가요)">✕</button>
       </div>
-      <div class="seed-cluster-chips">
-        <span class="seed-chip-label">추천</span>
-        ${chips}
-      </div>
+      ${cluster.title.trim()
+        ? ''
+        : '<div class="seed-cluster-hint">💡 비슷한 단어들을 아우르는 개념어를 한 단어로 붙여 보세요. 2단계에서 이 개념어가 어떤 핵심 개념과 이어지는지 살펴봐요.</div>'}
       <div class="seed-pool seed-sortable-list" data-cluster="${cluster.id}">
         ${seeds.length === 0
           ? '<div class="seed-empty">여기로 단어를 끌어다 놓아요</div>'
@@ -313,17 +310,6 @@ function bindPhase0Events() {
     if (clusterDel) {
       deleteCluster(clusterDel.dataset.cluster);
       renderPhase0();
-      return;
-    }
-    const chip = e.target.closest('.seed-concept-chip');
-    if (chip) {
-      const titleInput = board.querySelector(
-        `.seed-cluster-title[data-cluster="${chip.dataset.cluster}"]`
-      );
-      if (titleInput) {
-        titleInput.value = chip.dataset.name;
-        updateClusterTitle(chip.dataset.cluster, chip.dataset.name);
-      }
       return;
     }
     if (e.target.closest('#btnAddCluster')) {
