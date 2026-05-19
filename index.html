@@ -46,11 +46,13 @@
       <span class="autosave-badge" id="autosaveBadge">💾 자동저장</span>
       <button class="btn-settings" id="btnQr">📱 QR 코드</button>
       <button class="btn-settings" id="btnImport">📥 불러오기</button>
+      <button class="btn-settings" id="btnAggregate">📊 모아보기</button>
       <button class="btn-settings" id="btnExport">📤 내보내기</button>
       <button class="btn-settings" id="btnSettings">⚙️ 설정</button>
       <button class="btn-settings" id="btnReset">🔄 새로 시작</button>
     </div>
     <input type="file" id="fileImport" accept="application/json,.json" hidden>
+    <input type="file" id="fileAggregate" accept="application/json,.json" multiple hidden>
   </header>
 
   <!-- 단계 탭 네비게이션 -->
@@ -132,6 +134,20 @@
     <div class="modal-actions">
       <button class="btn btn-secondary" id="btnExportCancel">닫기</button>
     </div>
+  </div>
+</div>
+
+<!-- 교사용 모아보기 오버레이 -->
+<div class="aggregate-overlay hidden" id="aggregateView">
+  <div class="aggregate-panel">
+    <div class="aggregate-header">
+      <div class="aggregate-title">📊 모아보기 — 학급 탐구 지형도</div>
+      <div class="aggregate-header-actions">
+        <button class="btn-settings" id="btnAggregateAnon">🙈 이름 가리기</button>
+        <button class="btn-settings" id="btnAggregateClose">✕ 닫기</button>
+      </div>
+    </div>
+    <div class="aggregate-body" id="aggregateBody"></div>
   </div>
 </div>
 

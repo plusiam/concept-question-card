@@ -1152,6 +1152,140 @@ function resetAll() {
   updatePhaseBadges();
 }
 
+// ── 교사용 모아보기 (학생 JSON 종합) ──────────────────
+let aggregateDocs = [];
+let aggregateAnonymous = false;
+
+function readJsonFile(file) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try { resolve(JSON.parse(reader.result)); }
+      catch (e) { resolve(null); }
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsText(file);
+  });
+}
+
+function importAggregate(fileList) {
+  const files = [...fileList].slice(0, 30);
+  if (files.length === 0) return;
+  Promise.all(files.map(readJsonFile)).then(results => {
+    const docs = [];
+    results.forEach(data => {
+      if (data && data.app === 'concept-question-card' && Array.isArray(data.questions)) {
+        const meta = data.unitMeta || {};
+        docs.push({
+          name: (meta.groupName || '').trim() || '이름 미입력',
+          unitTitle: (meta.unitTitle || '').trim(),
+          questions: data.questions
+        });
+      }
+    });
+    if (docs.length === 0) {
+      alert('불러올 수 있는 질문 카드 파일이 없어요. 이 도구에서 내보낸 JSON인지 확인해 주세요.');
+      return;
+    }
+    aggregateDocs = docs;
+    const skipped = files.length - docs.length;
+    if (skipped > 0) {
+      alert(`${files.length}개 중 ${docs.length}개를 불러왔어요. (${skipped}개는 형식이 맞지 않아 건너뜀)`);
+    }
+    openAggregateView();
+  });
+}
+
+function openAggregateView() {
+  renderAggregate();
+  document.getElementById('aggregateView').classList.remove('hidden');
+}
+
+function closeAggregateView() {
+  document.getElementById('aggregateView').classList.add('hidden');
+}
+
+function toggleAggregateAnon() {
+  aggregateAnonymous = !aggregateAnonymous;
+  const btn = document.getElementById('btnAggregateAnon');
+  if (btn) btn.textContent = aggregateAnonymous ? '🙂 이름 보이기' : '🙈 이름 가리기';
+  renderAggregate();
+}
+
+function renderAggregate() {
+  const body = document.getElementById('aggregateBody');
+  if (!body) return;
+
+  const all = [];
+  aggregateDocs.forEach((doc, i) => {
+    doc.questions.forEach(q => all.push({ q, docIndex: i }));
+  });
+  const authorLabel = i => aggregateAnonymous ? `학생 ${i + 1}` : aggregateDocs[i].name;
+
+  const totalQ = all.length;
+  const classifiedQ = all.filter(
+    x => Array.isArray(x.q.conceptIds) && x.q.conceptIds.length > 0
+  ).length;
+
+  const cardHtml = x => `
+    <div class="agg-card">
+      <div class="agg-card-text">${x.q.starred ? '<span class="agg-star">★</span> ' : ''}${escapeHtml(x.q.text)}</div>
+      <div class="agg-card-meta">
+        <span class="agg-author">${escapeHtml(authorLabel(x.docIndex))}</span>
+        ${x.q.originWord ? `<span class="agg-origin">🌱 ${escapeHtml(x.q.originWord)}</span>` : ''}
+      </div>
+    </div>
+  `;
+
+  const groupsHtml = KEY_CONCEPTS.map(c => {
+    const items = all.filter(
+      x => Array.isArray(x.q.conceptIds) && x.q.conceptIds.includes(c.id)
+    );
+    return `
+      <div class="agg-group" style="border-color:${c.palette.accent}">
+        <div class="agg-group-head" style="background:${c.palette.bg};color:${c.palette.text}">
+          <span>${c.icon} ${c.name}</span>
+          <span class="agg-group-count">${items.length}</span>
+        </div>
+        <div class="agg-cards">
+          ${items.length === 0
+            ? '<div class="agg-empty">아직 이 개념의 질문이 없어요</div>'
+            : items.map(cardHtml).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const unclassified = all.filter(
+    x => !Array.isArray(x.q.conceptIds) || x.q.conceptIds.length === 0
+  );
+  const unclassifiedHtml = `
+    <div class="agg-group agg-group-unclassified">
+      <div class="agg-group-head">
+        <span>📋 아직 분류 안 한 질문</span>
+        <span class="agg-group-count">${unclassified.length}</span>
+      </div>
+      <div class="agg-cards">
+        ${unclassified.length === 0
+          ? '<div class="agg-empty">없어요</div>'
+          : unclassified.map(cardHtml).join('')}
+      </div>
+    </div>
+  `;
+
+  body.innerHTML = `
+    <div class="aggregate-stats">
+      <span class="agg-stat">👥 학생 <strong>${aggregateDocs.length}</strong>명</span>
+      <span class="agg-stat">❓ 질문 <strong>${totalQ}</strong>개</span>
+      <span class="agg-stat">🗂️ 분류된 질문 <strong>${classifiedQ}</strong>개</span>
+    </div>
+    <div class="aggregate-groups">
+      ${groupsHtml}
+      ${unclassifiedHtml}
+    </div>
+  `;
+}
+
 // ── 개념 체크박스 렌더링 ──────────────────────────────
 function renderConceptCheckGrid() {
   const grid = document.getElementById('conceptCheckGrid');
@@ -1187,6 +1321,16 @@ function bindEvents() {
   document.getElementById('qrModal').addEventListener('click', e => {
     if (e.target === e.currentTarget) closeQrModal();
   });
+
+  document.getElementById('btnAggregate').addEventListener('click', () => {
+    document.getElementById('fileAggregate').click();
+  });
+  document.getElementById('fileAggregate').addEventListener('change', e => {
+    if (e.target.files && e.target.files.length) importAggregate(e.target.files);
+    e.target.value = '';
+  });
+  document.getElementById('btnAggregateClose').addEventListener('click', closeAggregateView);
+  document.getElementById('btnAggregateAnon').addEventListener('click', toggleAggregateAnon);
   document.getElementById('btnExport').addEventListener('click', openExportModal);
   document.getElementById('btnImport').addEventListener('click', () => {
     document.getElementById('fileImport').click();
