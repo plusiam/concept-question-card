@@ -1480,10 +1480,28 @@ body {
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.1s, opacity 0.1s;
+  transition: transform 0.12s, opacity 0.12s, box-shadow 0.12s;
 }
 .scaffold-chip:hover { opacity: 0.85; }
-.scaffold-chip.on { transform: scale(1.05); box-shadow: var(--shadow-sm); }
+
+/* 선택된 개념 칩 — 크게 키우고 테두리 링·체크로 강조 */
+.scaffold-chip.on {
+  transform: scale(1.15);
+  font-size: 14px;
+  box-shadow: 0 0 0 3px var(--color-surface), 0 0 0 5px currentColor, var(--shadow-md);
+}
+.scaffold-chip.on::after {
+  content: ' ✓';
+  font-weight: 800;
+}
+
+/* 다른 칩은 흐리게 — 선택된 칩이 도드라지도록 */
+.scaffold-chips:has(.scaffold-chip.on) .scaffold-chip:not(.on) {
+  opacity: 0.4;
+}
+.scaffold-chips:has(.scaffold-chip.on) .scaffold-chip:not(.on):hover {
+  opacity: 0.85;
+}
 
 .scaffold-domains {
   display: flex;
