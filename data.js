@@ -31,7 +31,7 @@ const KEY_CONCEPTS = [
   },
   {
     id: 'causation',
-    name: '원인',
+    name: '인과관계',
     nameEn: 'Causation',
     keyQuestion: '왜 이렇게 되었을까?',
     icon: '⚡',
