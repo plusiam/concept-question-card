@@ -29,6 +29,7 @@ let rtMemberCount = 6;      // 자리 수
 let rtPollTimer = null;     // 폴링 타이머
 let rtTeacher = null;       // 로그인된 교사 사용자
 let rtTeacherStatus = null; // 교사 승인 상태 ('approved' | 'pending')
+let rtTeacherRole = null;   // 교사 권한 ('superadmin' | 'admin' | 'teacher' | 'pending')
 let rtEntryGroups = null;   // 학급코드 입장 시 모둠 목록
 let rtPendingAccess = null; // 자리 고르기 대기 중인 모둠 코드
 let rtCreated = null;       // 방금 개설한 학급 정보 {classCode, count}
@@ -1539,12 +1540,14 @@ function renderTeacherArea() {
          · 모둠 ${rtCreated.count}개 만들어졌어요. 학생에게 학급 코드를 알려주세요.
        </div>`
     : '';
+  const isAdmin = rtTeacherRole === 'admin' || rtTeacherRole === 'superadmin';
   return `
     <div class="teacher-row">
       <span class="room-bar-label">🧑‍🏫 ${escapeHtml(rtTeacher.email || '교사')}</span>
       <label>모둠 수 <input id="tgCount" class="room-num-input" type="number" min="1" max="8" value="4"></label>
       <label>주제 <input id="tgTopic" class="room-topic-input" maxlength="120" placeholder="예: 놀이터" value="${escapeHtml(state.unitMeta.unitTitle || '')}"></label>
       <button class="btn btn-primary btn-room" id="btnCreateClass">학급 개설</button>
+      ${isAdmin ? '<button class="btn btn-secondary btn-room" id="btnAdmin">👑 관리자</button>' : ''}
       <button class="room-teacher-toggle" id="btnTeacherLogout">로그아웃</button>
     </div>
     ${created}`;
@@ -1578,6 +1581,71 @@ function bindRoomBar() {
   document.getElementById('btnTeacherLogin')?.addEventListener('click', onTeacherLogin);
   document.getElementById('btnTeacherLogout')?.addEventListener('click', onTeacherLogout);
   document.getElementById('btnCreateClass')?.addEventListener('click', onCreateClass);
+  document.getElementById('btnAdmin')?.addEventListener('click', openAdminPanel);
+}
+
+// ── 관리자 패널 (admin/superadmin) — 교사 승인 관리 ──
+async function openAdminPanel() {
+  document.getElementById('adminOverlay')?.remove();
+  const res = await CQC_RT.listTeachers();
+  if (!res.ok) { alert('관리자 목록을 불러오지 못했어요: ' + res.error); return; }
+
+  const overlay = document.createElement('div');
+  overlay.id = 'adminOverlay';
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-title">👑 교사 승인 관리</div>
+      <div class="modal-subtitle">승인 대기 교사를 확인하고 승인해요. 승인하면 학급을 만들 수 있어요.</div>
+      <div class="admin-list" id="adminList"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btnAdminClose">닫기</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  renderAdminList(res.teachers);
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.getElementById('btnAdminClose').addEventListener('click', () => overlay.remove());
+}
+
+function renderAdminList(teachers) {
+  const host = document.getElementById('adminList');
+  if (!host) return;
+  if (!teachers.length) { host.innerHTML = '<div class="list-empty">등록된 교사가 없어요.</div>'; return; }
+  const roleLabel = { superadmin: '최고관리자', admin: '관리자', teacher: '교사', pending: '대기' };
+  host.innerHTML = teachers.map(t => {
+    const name = t.display_name || t.email || '(이름 없음)';
+    const pending = t.status === 'pending';
+    const isSuper = t.role === 'superadmin';
+    const isMe = rtTeacher && t.user_id === rtTeacher.id;
+    let action = '';
+    if (isSuper || isMe) {
+      action = `<span class="admin-self">${isMe ? '나' : '최고관리자'}</span>`;
+    } else if (pending) {
+      action = `<button class="btn btn-primary admin-btn" data-act="approve" data-id="${t.user_id}">승인</button>`;
+    } else {
+      action = `<button class="btn btn-secondary admin-btn" data-act="revoke" data-id="${t.user_id}">승인 취소</button>`;
+    }
+    return `
+      <div class="admin-row${pending ? ' pending' : ''}">
+        <div class="admin-who">
+          <div class="admin-name">${escapeHtml(name)}</div>
+          <div class="admin-meta">${escapeHtml(t.email || '')}${t.school ? ' · ' + escapeHtml(t.school) : ''} · ${roleLabel[t.role] || t.role}</div>
+        </div>
+        <div class="admin-status ${pending ? 'st-pending' : 'st-approved'}">${pending ? '⏳ 대기' : '✅ 승인됨'}</div>
+        <div class="admin-action">${action}</div>
+      </div>`;
+  }).join('');
+
+  host.querySelectorAll('.admin-btn').forEach(b => b.addEventListener('click', async () => {
+    b.disabled = true;
+    const status = b.dataset.act === 'approve' ? 'approved' : 'pending';
+    const res = await CQC_RT.setTeacherStatus(b.dataset.id, status);
+    if (!res.ok) { alert('변경 실패: ' + res.error); b.disabled = false; return; }
+    const refreshed = await CQC_RT.listTeachers();
+    if (refreshed.ok) renderAdminList(refreshed.teachers);
+  }));
 }
 
 // ── 학생 입장 흐름 ──
@@ -1645,7 +1713,7 @@ async function onTeacherLogin() {
 
 async function onTeacherLogout() {
   await CQC_RT.teacherLogout();
-  rtTeacher = null; rtTeacherStatus = null; rtCreated = null;
+  rtTeacher = null; rtTeacherStatus = null; rtTeacherRole = null; rtCreated = null;
   renderRoomBar(); showTeacherArea();
 }
 
@@ -1733,6 +1801,7 @@ async function initRealtime() {
   if (rtTeacher) {
     const st = await CQC_RT.teacherStatus();
     rtTeacherStatus = st.loggedIn ? st.status : null;
+    rtTeacherRole = st.loggedIn ? st.role : null;
     if (!inRoom()) renderRoomBar();
   }
   const saved = localStorage.getItem('cqc_rt_join');

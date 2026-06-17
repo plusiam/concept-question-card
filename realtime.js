@@ -48,6 +48,20 @@ const CQC_RT = (() => {
     return data;
   }
 
+  // ── 관리자 (admin/superadmin) ──
+  async function listTeachers() {
+    const { data, error } = await getClient().rpc('cqc_list_teachers');
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, teachers: data || [] };
+  }
+
+  async function setTeacherStatus(userId, status) {
+    const { error } = await getClient().rpc('cqc_set_teacher_status', {
+      p_user_id: userId, p_status: status
+    });
+    return error ? { ok: false, error: error.message } : { ok: true };
+  }
+
   // ── 교사: 학급(모둠 묶음) 개설 ──
   async function createClass(count, topic) {
     const { data, error } = await getClient().rpc('cqc_create_class', {
@@ -97,6 +111,7 @@ const CQC_RT = (() => {
   return {
     isConfigured,
     getTeacher, teacherLoginGoogle, teacherLogout, teacherStatus,
+    listTeachers, setTeacherStatus,
     createClass, classGroups, board,
     addQuestion, editQuestion, deleteQuestion
   };
