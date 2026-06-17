@@ -31,12 +31,25 @@ IB PYP 7개 핵심 개념을 활용한 탐구 질문 분류 보드. 교사가 �
 
 👉 [plusiam.github.io/concept-question-card](https://plusiam.github.io/concept-question-card/)
 
+## 모둠 실시간 모드 (선택)
+
+2단계 '질문과 분류'에서 한 모둠이 **같은 방에 모여 실시간으로 질문을 만들 수 있어요**. 질문 카드만 공유되고, 개념 분류·별표는 각자 기기에 남습니다. `think_gears`(생각톱니) 도구와 같은 방식입니다.
+
+- **켜기**: `config.js`의 `BACKEND_MODE`를 `'realtime'`으로 변경 (기본값은 `'local'` — 혼자 작업).
+- **교사**: 2단계 상단 바의 '교사용 ▾'에서 로그인 → 모둠 수·주제를 정해 '학급 개설' → **학급 코드 4자리**를 학생에게 알려줍니다.
+- **학생**: 학급(또는 모둠) 코드를 입력해 입장 → 모둠·자리번호 선택 → 질문을 만들면 ~2.5초 안에 모둠원 화면에 나타나요. **로그인 필요 없음.**
+- **권한**: 질문 수정·삭제는 **본인 자리에서 만든 것만**. 분류는 누구나 자유롭게.
+- **개인정보**: 학생 실명·학번은 서버로 보내지 않아요. 질문 글과 자리번호만 저장됩니다.
+
+> 실시간 백엔드는 plusiam의 `qar-board` Supabase 프로젝트 `concept_cards` 스키마를 사용합니다. 학생은 테이블에 직접 접근하지 않고, 접속코드로 보호된 RPC 함수만 호출합니다.
+
 ## 기술 스택
 
 - HTML / CSS / Vanilla JS (빌드 도구 없음)
 - [SortableJS](https://sortablejs.github.io/Sortable/) — 드래그앤드롭
+- [Supabase](https://supabase.com/) — 실시간 모드 백엔드(SECURITY DEFINER RPC + 폴링, 선택)
 - Google Fonts (Jua + Noto Sans KR)
-- LocalStorage — 자동 저장
+- LocalStorage — 자동 저장 / 실시간 모드의 분류·별표 보관
 
 ## 라이선스
 

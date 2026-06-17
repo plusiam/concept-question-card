@@ -1598,6 +1598,62 @@ body {
   gap: 16px;
 }
 
+/* ── 모둠 실시간 방 바 (realtime 모드 전용) ── */
+.room-bar {
+  background: #EEF7FF;
+  border: 1px solid #BCD9F2;
+  border-radius: var(--radius-card);
+  padding: 10px 14px;
+}
+.room-bar-in, .room-bar-out, .room-bar-group, .room-bar-seat {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px;
+}
+.room-bar-label { font-weight: 700; color: #1E4E79; }
+.room-code-chip {
+  font-family: monospace; font-size: 18px; font-weight: 800; letter-spacing: 2px;
+  color: #1E4E79; background: #fff; border: 1px dashed #6FA8DC; border-radius: 8px;
+  padding: 4px 12px; cursor: pointer;
+}
+.room-code-input {
+  width: 96px; letter-spacing: 3px; text-align: center; font-weight: 700;
+  border: 1px solid var(--color-border); border-radius: 8px; padding: 6px 10px; font-size: 14px;
+}
+.btn-room { padding: 6px 14px; }
+.room-seat b { color: #1E4E79; }
+.room-topic { font-size: 13px; color: #355; }
+.room-status { font-size: 13px; margin-left: auto; }
+.room-error { color: #B91C1C; font-size: 13px; margin-top: 8px; }
+
+/* 교사 영역 */
+.room-teacher-toggle {
+  background: none; border: none; color: #1E4E79; cursor: pointer;
+  font-size: 13px; text-decoration: underline; margin-left: auto;
+}
+.room-teacher { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #BCD9F2; }
+.teacher-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; }
+.teacher-row label { font-size: 13px; color: #355; display: inline-flex; align-items: center; gap: 6px; }
+.room-text-input, .room-topic-input {
+  border: 1px solid var(--color-border); border-radius: 8px; padding: 6px 10px; font-size: 14px; width: 160px;
+}
+.room-num-input {
+  width: 56px; border: 1px solid var(--color-border); border-radius: 8px; padding: 6px 8px; font-size: 14px;
+}
+.room-created {
+  margin-top: 8px; font-size: 13px; color: #166534;
+  background: #DCFCE7; border-radius: 8px; padding: 8px 10px;
+}
+
+/* 모둠/자리 고르기 */
+.group-grid, .seat-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.group-btn, .seat-btn {
+  min-width: 56px; padding: 8px 14px; border: 2px solid #6FA8DC; border-radius: 10px;
+  background: #fff; color: #1E4E79; font-weight: 700; font-size: 15px; cursor: pointer;
+}
+.group-btn:hover, .seat-btn:hover { background: #EEF7FF; }
+
+/* 실시간 카드 작성자(자리) 라벨 */
+.q-card-author { font-size: 11px; color: #6B7280; margin-bottom: 4px; }
+
 /* 질문 시작어 비계 — 가로 띠 */
 .scaffold-bar {
   background: var(--color-surface);
@@ -1809,6 +1865,7 @@ body {
   .step-help,
   .modal-overlay,
   .input-area,
+  .room-bar,
   .scaffold-bar,
   .seed-input-area,
   .seed-stats,

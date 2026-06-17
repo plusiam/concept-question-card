@@ -19,6 +19,58 @@ let scaffoldConceptId = null;
 // 1단계 단어에서 넘어온 질문에 붙일 출처 개념어 (다음 질문 추가 시 1회 소비)
 let pendingOriginWord = '';
 
+// ── 실시간(모둠) 모드 상태 ──────────────────────────────
+const POLL_MS = 2500;       // think_gears와 동일한 폴링 주기
+let rtAccessCode = null;    // 현재 입장한 모둠 접속코드 (null=미입장)
+let rtClassCode = null;     // 학급 코드 (있으면)
+let rtSeat = null;          // 내 자리번호 (author_seat)
+let rtTopic = '';           // 방 주제
+let rtMemberCount = 6;      // 자리 수
+let rtPollTimer = null;     // 폴링 타이머
+let rtTeacher = null;       // 로그인된 교사 사용자
+let rtEntryGroups = null;   // 학급코드 입장 시 모둠 목록
+let rtPendingAccess = null; // 자리 고르기 대기 중인 모둠 코드
+let rtCreated = null;       // 방금 개설한 학급 정보 {classCode, count}
+let rtError = '';           // 방 바 에러 메시지
+let rtDragging = false;     // 드래그 진행 중 (폴링 갱신 보류용)
+let pendingRemote = false;  // 상호작용 중 들어온 갱신 보류 플래그
+let pendingCards = null;    // 보류된 최신 보드 카드
+let lastBoardSig = '';      // 마지막 적용한 보드 서명 (불필요 재렌더 방지)
+
+// realtime 모드 + 연결 설정이 모두 갖춰졌을 때만 true
+function isRealtime() {
+  return CONFIG.BACKEND_MODE === 'realtime' && typeof CQC_RT !== 'undefined' && CQC_RT.isConfigured();
+}
+
+// 방에 입장한 상태인지
+function inRoom() {
+  return isRealtime() && !!rtAccessCode;
+}
+
+// 질문이 내 것인지 (실시간: 내 자리 / 로컬: 항상 true)
+function isMyQuestion(q) {
+  return !isRealtime() || q.author_seat === rtSeat;
+}
+
+// 로컬 분류 맵 — 실시간 모드에서 분류·별표는 각 기기에만 저장 (질문 id 키)
+function classMapKey() { return 'cqc_class_' + (rtAccessCode || ''); }
+function saveClassMap() {
+  try {
+    const map = {};
+    state.questions.forEach(q => { map[q.id] = { conceptIds: q.conceptIds, starred: q.starred }; });
+    localStorage.setItem(classMapKey(), JSON.stringify(map));
+  } catch (e) { /* 무시 */ }
+}
+function loadClassMap() {
+  try { return JSON.parse(localStorage.getItem(classMapKey()) || '{}'); }
+  catch (e) { return {}; }
+}
+// 분류·별표 변경 영속 — 실시간이면 로컬 분류 맵, 로컬이면 전체 상태 저장
+function persistClassification() {
+  if (isRealtime()) saveClassMap();
+  else saveState();
+}
+
 // ── LocalStorage ───────────────────────────────────────
 function saveState() {
   try {
@@ -68,12 +120,27 @@ function addQuestion(text, originWord) {
     originWord: (originWord || '').trim(),
     createdAt: new Date().toISOString()
   };
+  if (isRealtime()) {
+    if (!inRoom()) { alert('먼저 모둠 방에 입장해요.'); return null; }
+    // 서버가 id 생성 → 폴링으로 반영 (낙관적 추가 생략, pollNow로 즉시 갱신)
+    CQC_RT.addQuestion(rtAccessCode, rtSeat, q.text).then(res => {
+      if (!res.ok) alert('질문을 저장하지 못했어요: ' + res.error);
+      pollNow();
+    });
+    return null;
+  }
   state.questions.push(q);
   saveState();
   return q;
 }
 
 function deleteQuestion(id) {
+  if (isRealtime()) {
+    state.questions = state.questions.filter(q => q.id !== id); // 낙관적 제거
+    saveClassMap();
+    CQC_RT.deleteQuestion(rtAccessCode, id, rtSeat).then(() => pollNow());
+    return;
+  }
   state.questions = state.questions.filter(q => q.id !== id);
   saveState();
 }
@@ -83,7 +150,10 @@ function updateQuestionText(id, newText) {
   const q = state.questions.find(q => q.id === id);
   if (!q) return;
   const t = newText.trim();
-  if (t) { q.text = t; saveState(); }
+  if (!t || t === q.text) return;
+  q.text = t;
+  if (isRealtime()) { CQC_RT.editQuestion(rtAccessCode, id, rtSeat, t).then(() => pollNow()); }
+  else saveState();
 }
 
 // 다중 분류 추가 (최대 3개)
@@ -93,7 +163,7 @@ function addConceptToQuestion(id, conceptId) {
   if (q.conceptIds.includes(conceptId)) return false;
   if (q.conceptIds.length >= 3) return false;
   q.conceptIds.push(conceptId);
-  saveState();
+  persistClassification();
   return true;
 }
 
@@ -102,13 +172,13 @@ function removeConceptFromQuestion(id, conceptId) {
   const q = state.questions.find(q => q.id === id);
   if (!q) return;
   q.conceptIds = q.conceptIds.filter(c => c !== conceptId);
-  saveState();
+  persistClassification();
 }
 
 // 별표(탐구 질문 선택) 토글
 function toggleStar(id) {
   const q = state.questions.find(q => q.id === id);
-  if (q) { q.starred = !q.starred; saveState(); }
+  if (q) { q.starred = !q.starred; persistClassification(); }
 }
 
 // ── 1단계: 단어 시드 CRUD ─────────────────────────────
@@ -407,6 +477,7 @@ function renderPhase1() {
 
   panel.innerHTML = `
     <div class="board-page">
+      <div class="room-bar" id="roomBar"></div>
       <div class="input-area">
         <div class="input-label">✏️ 새 질문 만들기</div>
         <textarea
@@ -430,6 +501,7 @@ function renderPhase1() {
   bindInputEvents();
   bindScaffold();
   bindClassifyEvents();
+  renderRoomBar();
   renderScaffold();
   renderClassifyArea();
 }
@@ -546,19 +618,26 @@ function renderOriginChip(q) {
 }
 
 function renderQuestionCard(q, concept) {
+  // 실시간 모드 작성자(자리) 라벨 + 본인 여부
+  const authorTag = (isRealtime() && q.author_seat)
+    ? `<div class="q-card-author">✍ ${q.author_seat}번${q.author_seat === rtSeat ? ' (나)' : ''}</div>` : '';
+  const mine = isMyQuestion(q);
+
   // 미분류 카드 — 클릭하면 개념 버튼이 인라인으로 펼쳐짐
   if (!concept) {
     const expanded = q.id === expandedCardId;
     const concepts = getActiveConcepts();
+    const bodyHtml = (expanded && mine)
+      ? `<textarea class="q-card-edit" data-id="${q.id}" rows="2" maxlength="120">${escapeHtml(q.text)}</textarea>`
+      : `<div class="q-card-text">${escapeHtml(q.text)}</div>`;
     return `
       <div class="q-card unclassified-card${expanded ? ' expanded' : ''}" data-id="${q.id}">
-        ${expanded
-          ? `<textarea class="q-card-edit" data-id="${q.id}" rows="2" maxlength="120">${escapeHtml(q.text)}</textarea>`
-          : `<div class="q-card-text">${escapeHtml(q.text)}</div>`}
+        ${authorTag}
+        ${bodyHtml}
         ${renderOriginChip(q)}
         <div class="q-card-footer">
-          ${expanded ? '<span class="edit-hint">✏️ 위 칸에서 질문을 고칠 수 있어요</span>' : '<span></span>'}
-          <button class="btn-icon btn-delete-card" data-id="${q.id}" title="질문 삭제">✕</button>
+          ${(expanded && mine) ? '<span class="edit-hint">✏️ 위 칸에서 질문을 고칠 수 있어요</span>' : '<span></span>'}
+          ${mine ? `<button class="btn-icon btn-delete-card" data-id="${q.id}" title="질문 삭제">✕</button>` : ''}
         </div>
         ${expanded
           ? `<div class="inline-picker">
@@ -592,21 +671,28 @@ function renderQuestionCard(q, concept) {
     ? `<button class="btn-icon btn-add-concept" data-id="${q.id}" title="다른 개념에도 분류하기">＋</button>`
     : '';
 
-  const removeBtnHtml = q.conceptIds.length > 1
-    ? `<button class="btn-icon btn-remove-concept" data-id="${q.id}" data-concept="${concept.id}" title="이 개념에서 빼기">✕</button>`
-    : `<button class="btn-icon btn-delete-card" data-id="${q.id}" title="질문 삭제">✕</button>`;
+  // 실시간: ✕는 항상 '이 개념에서 빼기'(로컬). 질문 삭제는 미분류 카드에서 본인만.
+  // 로컬: 마지막 개념이면 ✕가 질문 삭제.
+  let removeBtnHtml;
+  if (isRealtime() || q.conceptIds.length > 1) {
+    removeBtnHtml = `<button class="btn-icon btn-remove-concept" data-id="${q.id}" data-concept="${concept.id}" title="이 개념에서 빼기">✕</button>`;
+  } else {
+    removeBtnHtml = `<button class="btn-icon btn-delete-card" data-id="${q.id}" title="질문 삭제">✕</button>`;
+  }
 
   const expanded = q.id === expandedCardId;
+  const bodyHtml = (expanded && mine)
+    ? `<textarea class="q-card-edit" data-id="${q.id}" rows="2" maxlength="120">${escapeHtml(q.text)}</textarea>`
+    : `<div class="q-card-text" title="클릭하면 질문 글을 고칠 수 있어요">${escapeHtml(q.text)}</div>`;
 
   return `
     <div class="q-card${expanded ? ' expanded' : ''}" data-id="${q.id}" style="border-color:${concept.palette.accent}">
       ${otherConcepts.length > 0 ? `<div class="concept-dots">${dotHtml}</div>` : ''}
-      ${expanded
-        ? `<textarea class="q-card-edit" data-id="${q.id}" rows="2" maxlength="120">${escapeHtml(q.text)}</textarea>`
-        : `<div class="q-card-text" title="클릭하면 질문 글을 고칠 수 있어요">${escapeHtml(q.text)}</div>`}
+      ${authorTag}
+      ${bodyHtml}
       ${renderOriginChip(q)}
       <div class="q-card-footer">
-        ${expanded ? '<span class="edit-hint">✏️ 수정 중</span>' : '<span></span>'}
+        ${(expanded && mine) ? '<span class="edit-hint">✏️ 수정 중</span>' : '<span></span>'}
         <div class="q-card-actions">
           ${addBtnHtml}
           ${removeBtnHtml}
@@ -714,7 +800,7 @@ function bindClassifyEvents() {
   // 질문 글 수정 저장 (편집 칸 blur)
   host.addEventListener('blur', e => {
     const ta = e.target.closest('.q-card-edit');
-    if (ta) updateQuestionText(ta.dataset.id, ta.value);
+    if (ta) { updateQuestionText(ta.dataset.id, ta.value); flushRemoteIfPending(); }
   }, true);
 
   // Enter로 수정 마치기 (Shift+Enter는 줄바꿈)
@@ -740,15 +826,17 @@ function initSortable() {
       preventOnFilter: false,
       ghostClass: 'sortable-ghost',
       dragClass: 'sortable-drag',
+      onStart() { rtDragging = true; },
       onEnd(evt) {
+        rtDragging = false;
         const cardId = evt.item.dataset.id;
         const fromConceptId = evt.from.dataset.concept || '';
         const toConceptId = evt.to.dataset.concept || '';
 
-        if (toConceptId === fromConceptId) return; // 같은 컬럼 내 정렬 — 무시
+        if (toConceptId === fromConceptId) { flushRemoteIfPending(); return; } // 같은 컬럼 내 정렬 — 무시
 
         const q = state.questions.find(q => q.id === cardId);
-        if (!q) return;
+        if (!q) { flushRemoteIfPending(); return; }
 
         if (!toConceptId) {
           q.conceptIds = [];
@@ -762,9 +850,10 @@ function initSortable() {
         }
 
         expandedCardId = null;
-        saveState();
+        persistClassification();
         renderClassifyArea();
         updatePhaseBadges();
+        flushRemoteIfPending();
       }
     });
   });
@@ -810,7 +899,11 @@ function openConceptPicker(questionId, anchorEl) {
 
   setTimeout(() => {
     document.addEventListener('click', function close(ev) {
-      if (!pop.contains(ev.target)) { pop.remove(); document.removeEventListener('click', close); }
+      if (!pop.contains(ev.target)) {
+        pop.remove();
+        document.removeEventListener('click', close);
+        flushRemoteIfPending();
+      }
     });
   }, 0);
 }
@@ -1363,6 +1456,284 @@ function bindEvents() {
   });
 }
 
+// ════════════════════════════════════════════════════════
+//  모둠 실시간 (qar-board · think_gears 방식: RPC + 폴링)
+// ════════════════════════════════════════════════════════
+
+// ── 모둠 방 바 (실시간 모드에서만 표시) ────────────────
+function renderRoomBar() {
+  const bar = document.getElementById('roomBar');
+  if (!bar) return;
+  if (!isRealtime()) { bar.innerHTML = ''; bar.style.display = 'none'; return; }
+  bar.style.display = '';
+
+  let html;
+  if (inRoom()) {
+    html = `
+      <div class="room-bar-in">
+        <span class="room-bar-label">👥 ${rtClassCode ? `${escapeHtml(rtClassCode)} 학급 · ` : ''}모둠</span>
+        <button class="room-code-chip" id="roomCodeChip" title="코드 복사">${escapeHtml(rtAccessCode)} 📋</button>
+        <span class="room-seat">내 자리 <b>${rtSeat}번</b></span>
+        ${rtTopic ? `<span class="room-topic">🔍 ${escapeHtml(rtTopic)}</span>` : ''}
+        <button class="btn btn-secondary btn-room" id="btnLeaveRoom">나가기</button>
+      </div>`;
+  } else if (rtPendingAccess) {
+    html = `
+      <div class="room-bar-seat">
+        <span class="room-bar-label">자리를 골라요 (모둠 코드 ${escapeHtml(rtPendingAccess)})</span>
+        <div class="seat-grid">
+          ${Array.from({ length: rtMemberCount }, (_, i) => i + 1).map(n =>
+            `<button class="seat-btn" data-seat="${n}">${n}번</button>`).join('')}
+        </div>
+        <button class="btn btn-secondary btn-room" id="btnSeatCancel">취소</button>
+      </div>`;
+  } else if (rtEntryGroups) {
+    html = `
+      <div class="room-bar-group">
+        <span class="room-bar-label">모둠을 골라요</span>
+        <div class="group-grid">
+          ${rtEntryGroups.map(g =>
+            `<button class="group-btn" data-acc="${g.access_code}" data-count="${g.member_count}">${g.group_no}모둠</button>`).join('')}
+        </div>
+        <button class="btn btn-secondary btn-room" id="btnGroupCancel">취소</button>
+      </div>`;
+  } else {
+    html = `
+      <div class="room-bar-out">
+        <span class="room-bar-label">👥 모둠 실시간</span>
+        <input id="roomCodeInput" class="room-code-input" maxlength="4" inputmode="numeric" placeholder="코드 4자리">
+        <button class="btn btn-primary btn-room" id="btnJoinRoom">입장</button>
+        <button class="room-teacher-toggle" id="btnTeacherToggle">교사용 ▾</button>
+      </div>
+      <div class="room-teacher" id="teacherArea" style="display:none">${renderTeacherArea()}</div>
+      ${rtError ? `<div class="room-error">⚠️ ${escapeHtml(rtError)}</div>` : ''}`;
+  }
+  bar.innerHTML = html;
+  bindRoomBar();
+}
+
+function renderTeacherArea() {
+  if (rtTeacher) {
+    const created = rtCreated
+      ? `<div class="room-created">
+           학급 코드 <b class="room-code-chip" id="createdClassChip" title="복사">${escapeHtml(rtCreated.classCode)} 📋</b>
+           · 모둠 ${rtCreated.count}개 만들어졌어요. 학생에게 학급 코드를 알려주세요.
+         </div>`
+      : '';
+    return `
+      <div class="teacher-row">
+        <span class="room-bar-label">🧑‍🏫 ${escapeHtml(rtTeacher.email || '교사')}</span>
+        <label>모둠 수 <input id="tgCount" class="room-num-input" type="number" min="1" max="8" value="4"></label>
+        <label>주제 <input id="tgTopic" class="room-topic-input" maxlength="120" placeholder="예: 놀이터" value="${escapeHtml(state.unitMeta.unitTitle || '')}"></label>
+        <button class="btn btn-primary btn-room" id="btnCreateClass">학급 개설</button>
+        <button class="room-teacher-toggle" id="btnTeacherLogout">로그아웃</button>
+      </div>
+      ${created}`;
+  }
+  return `
+    <div class="teacher-row">
+      <input id="tEmail" class="room-text-input" type="email" placeholder="교사 이메일" autocomplete="username">
+      <input id="tPass" class="room-text-input" type="password" placeholder="비밀번호" autocomplete="current-password">
+      <button class="btn btn-secondary btn-room" id="btnTeacherLogin">로그인</button>
+    </div>`;
+}
+
+function bindRoomBar() {
+  document.getElementById('btnJoinRoom')?.addEventListener('click', onJoinCode);
+  document.getElementById('roomCodeInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') onJoinCode(); });
+  document.getElementById('btnLeaveRoom')?.addEventListener('click', () => leaveRoom());
+
+  document.getElementById('roomCodeChip')?.addEventListener('click', () =>
+    navigator.clipboard?.writeText(rtAccessCode).then(() => flashAutosave()).catch(() => {}));
+  document.getElementById('createdClassChip')?.addEventListener('click', () =>
+    navigator.clipboard?.writeText(rtCreated.classCode).then(() => flashAutosave()).catch(() => {}));
+
+  document.querySelectorAll('.group-btn').forEach(b => b.addEventListener('click', () => {
+    rtPendingAccess = b.dataset.acc;
+    rtMemberCount = parseInt(b.dataset.count) || 6;
+    rtEntryGroups = null;
+    renderRoomBar();
+  }));
+  document.querySelectorAll('.seat-btn').forEach(b => b.addEventListener('click', () =>
+    enterRoom(rtPendingAccess, parseInt(b.dataset.seat))));
+  document.getElementById('btnSeatCancel')?.addEventListener('click', () => { rtPendingAccess = null; renderRoomBar(); });
+  document.getElementById('btnGroupCancel')?.addEventListener('click', () => { rtEntryGroups = null; renderRoomBar(); });
+
+  document.getElementById('btnTeacherToggle')?.addEventListener('click', () => {
+    const a = document.getElementById('teacherArea');
+    if (a) a.style.display = a.style.display === 'none' ? '' : 'none';
+  });
+  document.getElementById('btnTeacherLogin')?.addEventListener('click', onTeacherLogin);
+  document.getElementById('btnTeacherLogout')?.addEventListener('click', onTeacherLogout);
+  document.getElementById('btnCreateClass')?.addEventListener('click', onCreateClass);
+}
+
+// ── 학생 입장 흐름 ──
+async function onJoinCode() {
+  rtError = '';
+  const code = (document.getElementById('roomCodeInput')?.value || '').trim();
+  if (!/^[0-9]{4}$/.test(code)) { rtError = '코드 4자리를 입력해요.'; renderRoomBar(); return; }
+  const cls = await CQC_RT.classGroups(code);
+  if (cls.ok && cls.groups.length > 0) {
+    rtClassCode = code;
+    rtEntryGroups = cls.groups;
+    rtTopic = cls.groups[0].topic || '';
+    renderRoomBar();
+    return;
+  }
+  const bd = await CQC_RT.board(code);
+  if (!bd.ok) { rtError = '그런 코드가 없어요. 다시 확인해 주세요.'; renderRoomBar(); return; }
+  rtPendingAccess = code;
+  rtMemberCount = bd.session?.member_count || 6;
+  rtTopic = bd.session?.topic || '';
+  rtClassCode = bd.session?.class_code || null;
+  renderRoomBar();
+}
+
+// 방 입장 — 폴링 시작
+async function enterRoom(accessCode, seat) {
+  rtAccessCode = accessCode;
+  rtSeat = seat;
+  rtPendingAccess = null;
+  rtEntryGroups = null;
+  rtError = '';
+  lastBoardSig = '';
+  localStorage.setItem('cqc_rt_join', JSON.stringify({ code: accessCode, seat }));
+
+  const bd = await CQC_RT.board(accessCode);
+  if (bd.ok) {
+    rtTopic = bd.session?.topic || rtTopic;
+    rtClassCode = bd.session?.class_code || rtClassCode;
+    applyCards(bd.cards);
+  }
+  startPolling();
+  renderRoomBar();
+  updatePhaseBadges();
+}
+
+function leaveRoom(msg) {
+  stopPolling();
+  rtAccessCode = null; rtSeat = null; rtClassCode = null; rtTopic = '';
+  rtPendingAccess = null; rtEntryGroups = null;
+  state.questions = [];
+  localStorage.removeItem('cqc_rt_join');
+  if (msg) rtError = msg;
+  renderRoomBar();
+  renderClassifyArea();
+  updatePhaseBadges();
+}
+
+// ── 교사 흐름 ──
+async function onTeacherLogin() {
+  rtError = '';
+  const email = document.getElementById('tEmail')?.value.trim();
+  const pass = document.getElementById('tPass')?.value || '';
+  if (!email || !pass) { rtError = '이메일과 비밀번호를 입력해요.'; renderRoomBar(); showTeacherArea(); return; }
+  const res = await CQC_RT.teacherLogin(email, pass);
+  if (!res.ok) { rtError = '로그인 실패: ' + res.error; renderRoomBar(); showTeacherArea(); return; }
+  rtTeacher = res.user;
+  renderRoomBar(); showTeacherArea();
+}
+
+async function onTeacherLogout() {
+  await CQC_RT.teacherLogout();
+  rtTeacher = null; rtCreated = null;
+  renderRoomBar(); showTeacherArea();
+}
+
+async function onCreateClass() {
+  rtError = '';
+  const count = parseInt(document.getElementById('tgCount')?.value) || 4;
+  const topic = document.getElementById('tgTopic')?.value.trim() || '';
+  const res = await CQC_RT.createClass(count, topic);
+  if (!res.ok) { rtError = '개설 실패: ' + res.error; renderRoomBar(); showTeacherArea(); return; }
+  rtCreated = { classCode: res.classCode, count: res.count };
+  renderRoomBar(); showTeacherArea();
+}
+
+function showTeacherArea() {
+  const a = document.getElementById('teacherArea');
+  if (a) a.style.display = '';
+}
+
+// ── 폴링 ──────────────────────────────────────────────
+function startPolling() {
+  stopPolling();
+  rtPollTimer = setInterval(pollNow, POLL_MS);
+}
+function stopPolling() {
+  if (rtPollTimer) { clearInterval(rtPollTimer); rtPollTimer = null; }
+}
+async function pollNow() {
+  if (!inRoom()) return;
+  const res = await CQC_RT.board(rtAccessCode);
+  if (!res.ok) {
+    if (res.code === 'P0002') leaveRoom('방이 종료되었어요.');
+    return;
+  }
+  mergeBoard(res.cards);
+}
+
+// 서버 보드 → state.questions (로컬 분류 병합). 상호작용 중이면 보류.
+function mergeBoard(cards) {
+  const sig = cards.map(c => c.id + '|' + c.text + '|' + c.author_seat).join('~');
+  if (sig === lastBoardSig) return;
+  if (interactionActive()) { pendingCards = cards; pendingRemote = true; return; }
+  applyCards(cards);
+}
+
+function applyCards(cards) {
+  lastBoardSig = cards.map(c => c.id + '|' + c.text + '|' + c.author_seat).join('~');
+  const cm = loadClassMap();
+  state.questions = cards.map(c => ({
+    id: c.id, text: c.text, author_seat: c.author_seat,
+    conceptIds: cm[c.id]?.conceptIds || [],
+    starred: cm[c.id]?.starred || false,
+    originWord: '',
+    createdAt: c.created_at
+  }));
+  const p = currentPhaseNum();
+  if (p === 1) renderClassifyArea();
+  else if (p === 2) renderInquiry();
+  updatePhaseBadges();
+}
+
+// ── 상호작용 보호 (폴링 갱신 보류) ────────────────────
+function currentPhaseNum() {
+  const tab = document.querySelector('.phase-tab.active');
+  return tab ? parseInt(tab.dataset.phase) : 1;
+}
+
+function interactionActive() {
+  if (rtDragging) return true;
+  const a = document.activeElement;
+  if (a && a.classList && a.classList.contains('q-card-edit')) return true;
+  if (document.getElementById('conceptPickerPop')) return true;
+  return false;
+}
+
+function flushRemoteIfPending() {
+  if (pendingRemote && !interactionActive()) {
+    pendingRemote = false;
+    if (pendingCards) { const c = pendingCards; pendingCards = null; applyCards(c); }
+  }
+}
+
+// 실시간 초기화 — 교사 로그인 복원 + 새로고침 후 모둠 재입장
+async function initRealtime() {
+  rtTeacher = await CQC_RT.getTeacher();
+  const saved = localStorage.getItem('cqc_rt_join');
+  if (saved) {
+    try {
+      const { code, seat } = JSON.parse(saved);
+      const bd = await CQC_RT.board(code);
+      if (bd.ok) { await enterRoom(code, seat); return; }
+    } catch (e) { /* 무시 */ }
+    localStorage.removeItem('cqc_rt_join');
+  }
+  renderRoomBar();
+}
+
 // ── 초기화 ────────────────────────────────────────────
 function init() {
   loadState();
@@ -1372,6 +1743,14 @@ function init() {
   updateHeader();
   switchPhase(1);
   updatePhaseBadges();
+
+  // 실시간 모드: 질문은 서버가 출처이므로 비우고, 교사 세션/저장된 입장 복원
+  if (isRealtime()) {
+    state.questions = [];
+    renderClassifyArea();
+    initRealtime();
+  }
+
   if (!state.unitMeta.unitTitle) {
     setTimeout(() => document.getElementById('headerTopic')?.focus(), 100);
   }
