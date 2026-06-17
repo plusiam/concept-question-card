@@ -28,6 +28,7 @@ let rtTopic = '';           // 방 주제
 let rtMemberCount = 6;      // 자리 수
 let rtPollTimer = null;     // 폴링 타이머
 let rtTeacher = null;       // 로그인된 교사 사용자
+let rtTeacherStatus = null; // 교사 승인 상태 ('approved' | 'pending')
 let rtEntryGroups = null;   // 학급코드 입장 시 모둠 목록
 let rtPendingAccess = null; // 자리 고르기 대기 중인 모둠 코드
 let rtCreated = null;       // 방금 개설한 학급 정보 {classCode, count}
@@ -1513,29 +1514,40 @@ function renderRoomBar() {
 }
 
 function renderTeacherArea() {
-  if (rtTeacher) {
-    const created = rtCreated
-      ? `<div class="room-created">
-           학급 코드 <b class="room-code-chip" id="createdClassChip" title="복사">${escapeHtml(rtCreated.classCode)} 📋</b>
-           · 모둠 ${rtCreated.count}개 만들어졌어요. 학생에게 학급 코드를 알려주세요.
-         </div>`
-      : '';
+  // 로그인 안 됨 → Google 로그인 버튼
+  if (!rtTeacher) {
+    return `
+      <div class="teacher-row">
+        <span class="room-bar-label">🧑‍🏫 교사용</span>
+        <button class="btn btn-secondary btn-room" id="btnTeacherLogin">Google로 로그인</button>
+        <span class="room-or">로그인 후 학급(방)을 만들 수 있어요</span>
+      </div>`;
+  }
+  // 로그인됨 + 승인 대기 → 안내만
+  if (rtTeacherStatus && rtTeacherStatus !== 'approved') {
     return `
       <div class="teacher-row">
         <span class="room-bar-label">🧑‍🏫 ${escapeHtml(rtTeacher.email || '교사')}</span>
-        <label>모둠 수 <input id="tgCount" class="room-num-input" type="number" min="1" max="8" value="4"></label>
-        <label>주제 <input id="tgTopic" class="room-topic-input" maxlength="120" placeholder="예: 놀이터" value="${escapeHtml(state.unitMeta.unitTitle || '')}"></label>
-        <button class="btn btn-primary btn-room" id="btnCreateClass">학급 개설</button>
+        <span class="room-pending">⏳ 승인 대기 중이에요. 관리자 승인 후 학급을 만들 수 있어요.</span>
         <button class="room-teacher-toggle" id="btnTeacherLogout">로그아웃</button>
-      </div>
-      ${created}`;
+      </div>`;
   }
+  // 로그인됨 + 승인 → 학급 개설 폼
+  const created = rtCreated
+    ? `<div class="room-created">
+         학급 코드 <b class="room-code-chip" id="createdClassChip" title="복사">${escapeHtml(rtCreated.classCode)} 📋</b>
+         · 모둠 ${rtCreated.count}개 만들어졌어요. 학생에게 학급 코드를 알려주세요.
+       </div>`
+    : '';
   return `
     <div class="teacher-row">
-      <input id="tEmail" class="room-text-input" type="email" placeholder="교사 이메일" autocomplete="username">
-      <input id="tPass" class="room-text-input" type="password" placeholder="비밀번호" autocomplete="current-password">
-      <button class="btn btn-secondary btn-room" id="btnTeacherLogin">로그인</button>
-    </div>`;
+      <span class="room-bar-label">🧑‍🏫 ${escapeHtml(rtTeacher.email || '교사')}</span>
+      <label>모둠 수 <input id="tgCount" class="room-num-input" type="number" min="1" max="8" value="4"></label>
+      <label>주제 <input id="tgTopic" class="room-topic-input" maxlength="120" placeholder="예: 놀이터" value="${escapeHtml(state.unitMeta.unitTitle || '')}"></label>
+      <button class="btn btn-primary btn-room" id="btnCreateClass">학급 개설</button>
+      <button class="room-teacher-toggle" id="btnTeacherLogout">로그아웃</button>
+    </div>
+    ${created}`;
 }
 
 function bindRoomBar() {
@@ -1626,18 +1638,14 @@ function leaveRoom(msg) {
 // ── 교사 흐름 ──
 async function onTeacherLogin() {
   rtError = '';
-  const email = document.getElementById('tEmail')?.value.trim();
-  const pass = document.getElementById('tPass')?.value || '';
-  if (!email || !pass) { rtError = '이메일과 비밀번호를 입력해요.'; renderRoomBar(); showTeacherArea(); return; }
-  const res = await CQC_RT.teacherLogin(email, pass);
-  if (!res.ok) { rtError = '로그인 실패: ' + res.error; renderRoomBar(); showTeacherArea(); return; }
-  rtTeacher = res.user;
-  renderRoomBar(); showTeacherArea();
+  // Google로 이동 → 승인된 페이지로 복귀 (복귀 후 initRealtime이 상태 복원)
+  const res = await CQC_RT.teacherLoginGoogle();
+  if (!res.ok) { rtError = '로그인 실패: ' + res.error; renderRoomBar(); showTeacherArea(); }
 }
 
 async function onTeacherLogout() {
   await CQC_RT.teacherLogout();
-  rtTeacher = null; rtCreated = null;
+  rtTeacher = null; rtTeacherStatus = null; rtCreated = null;
   renderRoomBar(); showTeacherArea();
 }
 
@@ -1722,6 +1730,11 @@ function flushRemoteIfPending() {
 // 실시간 초기화 — 교사 로그인 복원 + 새로고침 후 모둠 재입장
 async function initRealtime() {
   rtTeacher = await CQC_RT.getTeacher();
+  if (rtTeacher) {
+    const st = await CQC_RT.teacherStatus();
+    rtTeacherStatus = st.loggedIn ? st.status : null;
+    if (!inRoom()) renderRoomBar();
+  }
   const saved = localStorage.getItem('cqc_rt_join');
   if (saved) {
     try {

@@ -27,14 +27,25 @@ const CQC_RT = (() => {
     return data?.session?.user || null;
   }
 
-  async function teacherLogin(email, password) {
-    const { data, error } = await getClient().auth.signInWithPassword({ email, password });
+  // Google 로그인 — 현재 페이지로 돌아오게 리다이렉트
+  async function teacherLoginGoogle() {
+    const { error } = await getClient().auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.href.split('#')[0] }
+    });
     if (error) return { ok: false, error: error.message };
-    return { ok: true, user: data.user };
+    return { ok: true }; // 페이지가 구글로 이동했다가 돌아옴
   }
 
   async function teacherLogout() {
     await getClient().auth.signOut();
+  }
+
+  // 승인 상태 조회 (approved / pending)
+  async function teacherStatus() {
+    const { data, error } = await getClient().rpc('cqc_teacher_status');
+    if (error) return { loggedIn: false };
+    return data;
   }
 
   // ── 교사: 학급(모둠 묶음) 개설 ──
@@ -85,7 +96,7 @@ const CQC_RT = (() => {
 
   return {
     isConfigured,
-    getTeacher, teacherLogin, teacherLogout,
+    getTeacher, teacherLoginGoogle, teacherLogout, teacherStatus,
     createClass, classGroups, board,
     addQuestion, editQuestion, deleteQuestion
   };

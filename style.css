@@ -1642,6 +1642,7 @@ body {
   margin-top: 8px; font-size: 13px; color: #166534;
   background: #DCFCE7; border-radius: 8px; padding: 8px 10px;
 }
+.room-pending { font-size: 13px; color: #92400E; background: #FEF3C7; border-radius: 8px; padding: 6px 10px; }
 
 /* 모둠/자리 고르기 */
 .group-grid, .seat-grid { display: flex; flex-wrap: wrap; gap: 8px; }
