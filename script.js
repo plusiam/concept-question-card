@@ -1547,6 +1547,7 @@ function renderTeacherArea() {
       <label>모둠 수 <input id="tgCount" class="room-num-input" type="number" min="1" max="8" value="4"></label>
       <label>주제 <input id="tgTopic" class="room-topic-input" maxlength="120" placeholder="예: 놀이터" value="${escapeHtml(state.unitMeta.unitTitle || '')}"></label>
       <button class="btn btn-primary btn-room" id="btnCreateClass">학급 개설</button>
+      <button class="btn btn-secondary btn-room" id="btnMyClasses">📋 내 학급</button>
       ${isAdmin ? '<button class="btn btn-secondary btn-room" id="btnAdmin">👑 관리자</button>' : ''}
       <button class="room-teacher-toggle" id="btnTeacherLogout">로그아웃</button>
     </div>
@@ -1581,7 +1582,70 @@ function bindRoomBar() {
   document.getElementById('btnTeacherLogin')?.addEventListener('click', onTeacherLogin);
   document.getElementById('btnTeacherLogout')?.addEventListener('click', onTeacherLogout);
   document.getElementById('btnCreateClass')?.addEventListener('click', onCreateClass);
+  document.getElementById('btnMyClasses')?.addEventListener('click', openClassesPanel);
   document.getElementById('btnAdmin')?.addEventListener('click', openAdminPanel);
+}
+
+// ── 내 학급 콘솔 (입장 링크 + QR) ──────────────────────
+function roomLink(code) {
+  return location.origin + location.pathname + '?code=' + code;
+}
+
+function qrSvg(url) {
+  if (typeof qrcode === 'undefined') return '<div class="qr-fallback">QR 없음</div>';
+  const qr = qrcode(0, 'M');
+  qr.addData(url);
+  qr.make();
+  return qr.createSvgTag({ cellSize: 3, margin: 1, scalable: true });
+}
+
+async function openClassesPanel() {
+  document.getElementById('classesOverlay')?.remove();
+  const res = await CQC_RT.myClasses();
+  if (!res.ok) { alert('학급 목록을 불러오지 못했어요: ' + res.error); return; }
+
+  const overlay = document.createElement('div');
+  overlay.id = 'classesOverlay';
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-title">📋 내 학급</div>
+      <div class="modal-subtitle">학급별 모둠 코드·입장 링크·QR이에요. 학생에게 QR을 보여주면 코드 없이 바로 들어와요.</div>
+      <div class="classes-list">${renderClassesList(res.classes)}</div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btnClassesClose">닫기</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.getElementById('btnClassesClose').addEventListener('click', () => overlay.remove());
+  // 링크 복사
+  overlay.querySelectorAll('.room-link-copy').forEach(b => b.addEventListener('click', () => {
+    navigator.clipboard?.writeText(b.dataset.link).then(() => { b.textContent = '복사됨'; setTimeout(() => b.textContent = '링크 복사', 1200); }).catch(() => {});
+  }));
+}
+
+function renderClassesList(classes) {
+  if (!classes.length) return '<div class="list-empty">아직 만든 학급이 없어요. \'학급 개설\'로 시작해요.</div>';
+  return classes.map(cls => `
+    <div class="class-card">
+      <div class="class-card-head">
+        <span class="class-code-big">${escapeHtml(cls.class_code)}</span>
+        <span class="class-topic">🔍 ${escapeHtml(cls.topic || '주제 없음')}</span>
+      </div>
+      <div class="group-link-grid">
+        ${cls.groups.map(g => `
+          <div class="group-link-item">
+            <div class="group-link-qr">${qrSvg(roomLink(g.access_code))}</div>
+            <div class="group-link-no">${g.group_no}모둠</div>
+            <div class="group-link-code">${escapeHtml(g.access_code)}</div>
+            <button class="room-link-copy" data-link="${roomLink(g.access_code)}">링크 복사</button>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
 }
 
 // ── 관리자 패널 (admin/superadmin) — 교사 승인 관리 ──
@@ -1804,6 +1868,25 @@ async function initRealtime() {
     rtTeacherRole = st.loggedIn ? st.role : null;
     if (!inRoom()) renderRoomBar();
   }
+
+  // QR/링크 자동 입장 (?code=XXXX) — 학급코드면 모둠 선택, 모둠코드면 자리 선택으로 직행
+  const urlCode = new URLSearchParams(location.search).get('code');
+  if (urlCode && /^[0-9]{4}$/.test(urlCode)) {
+    const cls = await CQC_RT.classGroups(urlCode);
+    if (cls.ok && cls.groups.length > 0) {
+      rtClassCode = urlCode; rtEntryGroups = cls.groups; rtTopic = cls.groups[0].topic || '';
+      renderRoomBar(); return;
+    }
+    const bd = await CQC_RT.board(urlCode);
+    if (bd.ok) {
+      rtPendingAccess = urlCode;
+      rtMemberCount = bd.session?.member_count || 6;
+      rtTopic = bd.session?.topic || '';
+      rtClassCode = bd.session?.class_code || null;
+      renderRoomBar(); return;
+    }
+  }
+
   const saved = localStorage.getItem('cqc_rt_join');
   if (saved) {
     try {

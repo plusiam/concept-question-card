@@ -62,6 +62,13 @@ const CQC_RT = (() => {
     return error ? { ok: false, error: error.message } : { ok: true };
   }
 
+  // ── 교사: 내가 만든 학급 목록 ──
+  async function myClasses() {
+    const { data, error } = await getClient().rpc('cqc_my_classes');
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, classes: data || [] };
+  }
+
   // ── 교사: 학급(모둠 묶음) 개설 ──
   async function createClass(count, topic) {
     const { data, error } = await getClient().rpc('cqc_create_class', {
@@ -112,7 +119,7 @@ const CQC_RT = (() => {
     isConfigured,
     getTeacher, teacherLoginGoogle, teacherLogout, teacherStatus,
     listTeachers, setTeacherStatus,
-    createClass, classGroups, board,
+    myClasses, createClass, classGroups, board,
     addQuestion, editQuestion, deleteQuestion
   };
 })();

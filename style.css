@@ -1660,6 +1660,30 @@ body {
 .admin-btn { padding: 5px 12px; font-size: 13px; }
 .admin-self { font-size: 12px; color: var(--color-text-sub); }
 
+/* ── 내 학급 콘솔 (링크 + QR) ── */
+.classes-list { display: flex; flex-direction: column; gap: 14px; max-height: 60vh; overflow-y: auto; margin: 8px 0; }
+.class-card { border: 1px solid var(--color-border); border-radius: 12px; padding: 12px; }
+.class-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.class-code-big {
+  font-family: monospace; font-size: 20px; font-weight: 800; letter-spacing: 2px;
+  color: #1E4E79; background: #EEF7FF; border-radius: 8px; padding: 2px 10px;
+}
+.class-topic { font-size: 13px; color: var(--color-text-sub); }
+.group-link-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+.group-link-item {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  border: 1px solid var(--color-border); border-radius: 10px; padding: 8px;
+}
+.group-link-qr { width: 84px; height: 84px; }
+.group-link-qr svg { width: 100%; height: 100%; }
+.group-link-no { font-weight: 700; font-size: 13px; }
+.group-link-code { font-family: monospace; font-size: 14px; letter-spacing: 1px; color: #1E4E79; }
+.room-link-copy {
+  font-size: 11px; border: 1px solid var(--color-border); background: #fff;
+  border-radius: 6px; padding: 3px 8px; cursor: pointer; color: var(--color-text-sub);
+}
+.room-link-copy:hover { background: var(--color-primary-light); color: var(--color-primary); }
+
 /* 모둠/자리 고르기 */
 .group-grid, .seat-grid { display: flex; flex-wrap: wrap; gap: 8px; }
 .group-btn, .seat-btn {
