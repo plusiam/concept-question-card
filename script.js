@@ -1756,45 +1756,60 @@ async function onDownloadClass(classCode, topic) {
 // ── 관리자 패널 (admin/superadmin) — 교사 승인 관리 ──
 async function openAdminPanel() {
   document.getElementById('adminOverlay')?.remove();
-  const res = await CQC_RT.listTeachers();
-  if (!res.ok) { alert('관리자 목록을 불러오지 못했어요: ' + res.error); return; }
+  const isSuper = rtTeacherRole === 'superadmin';
 
   const overlay = document.createElement('div');
   overlay.id = 'adminOverlay';
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
-    <div class="modal-box">
-      <div class="modal-title">👑 교사 승인 관리</div>
-      <div class="modal-subtitle">승인 대기 교사를 확인하고 승인해요. 승인하면 학급을 만들 수 있어요.</div>
-      <div class="admin-list" id="adminList"></div>
+    <div class="modal-box modal-box-lg">
+      <div class="modal-title">👑 관리자 ${isSuper ? '(최고관리자)' : ''}</div>
+      <div class="modal-subtitle">교사 가입 승인·권한과 학급을 관리해요.</div>
+      <div class="admin-section-title">🧑‍🏫 교사 관리</div>
+      <div class="admin-list" id="adminTeachers"><div class="list-empty">불러오는 중…</div></div>
+      <div class="admin-section-title">🏫 학급 관리</div>
+      <div class="admin-list" id="adminClasses"><div class="list-empty">불러오는 중…</div></div>
       <div class="modal-actions">
         <button class="btn btn-secondary" id="btnAdminClose">닫기</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
-  renderAdminList(res.teachers);
-
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   document.getElementById('btnAdminClose').addEventListener('click', () => overlay.remove());
+
+  refreshAdminTeachers();
+  refreshAdminClasses();
 }
 
-function renderAdminList(teachers) {
-  const host = document.getElementById('adminList');
+async function refreshAdminTeachers() {
+  const res = await CQC_RT.listTeachers();
+  const host = document.getElementById('adminTeachers');
+  if (!host) return;
+  if (!res.ok) { host.innerHTML = `<div class="list-empty">${escapeHtml(res.error)}</div>`; return; }
+  renderAdminTeachers(res.teachers);
+}
+
+function renderAdminTeachers(teachers) {
+  const host = document.getElementById('adminTeachers');
   if (!host) return;
   if (!teachers.length) { host.innerHTML = '<div class="list-empty">등록된 교사가 없어요.</div>'; return; }
+  const isSuper = rtTeacherRole === 'superadmin';
   const roleLabel = { superadmin: '최고관리자', admin: '관리자', teacher: '교사', pending: '대기' };
   host.innerHTML = teachers.map(t => {
     const name = t.display_name || t.email || '(이름 없음)';
     const pending = t.status === 'pending';
-    const isSuper = t.role === 'superadmin';
+    const isTargetSuper = t.role === 'superadmin';
     const isMe = rtTeacher && t.user_id === rtTeacher.id;
-    let action = '';
-    if (isSuper || isMe) {
-      action = `<span class="admin-self">${isMe ? '나' : '최고관리자'}</span>`;
-    } else if (pending) {
-      action = `<button class="btn btn-primary admin-btn" data-act="approve" data-id="${t.user_id}">승인</button>`;
-    } else {
-      action = `<button class="btn btn-secondary admin-btn" data-act="revoke" data-id="${t.user_id}">승인 취소</button>`;
+    let approveBtn = '';
+    if (isTargetSuper || isMe) approveBtn = `<span class="admin-self">${isMe ? '나' : '최고관리자'}</span>`;
+    else if (pending) approveBtn = `<button class="btn btn-primary admin-btn" data-act="approve" data-id="${t.user_id}">승인</button>`;
+    else approveBtn = `<button class="btn btn-secondary admin-btn" data-act="revoke" data-id="${t.user_id}">승인 취소</button>`;
+    // 역할 변경: 최고관리자만, 승인된 일반/관리자에게만
+    let roleBtn = '';
+    if (isSuper && !isTargetSuper && !isMe && !pending) {
+      roleBtn = t.role === 'admin'
+        ? `<button class="btn btn-secondary admin-btn" data-act="demote" data-id="${t.user_id}">관리자 해제</button>`
+        : `<button class="btn btn-secondary admin-btn" data-act="promote" data-id="${t.user_id}">관리자 지정</button>`;
     }
     return `
       <div class="admin-row${pending ? ' pending' : ''}">
@@ -1803,17 +1818,52 @@ function renderAdminList(teachers) {
           <div class="admin-meta">${escapeHtml(t.email || '')}${t.school ? ' · ' + escapeHtml(t.school) : ''} · ${roleLabel[t.role] || t.role}</div>
         </div>
         <div class="admin-status ${pending ? 'st-pending' : 'st-approved'}">${pending ? '⏳ 대기' : '✅ 승인됨'}</div>
-        <div class="admin-action">${action}</div>
+        <div class="admin-action">${roleBtn}${approveBtn}</div>
       </div>`;
   }).join('');
 
   host.querySelectorAll('.admin-btn').forEach(b => b.addEventListener('click', async () => {
     b.disabled = true;
-    const status = b.dataset.act === 'approve' ? 'approved' : 'pending';
-    const res = await CQC_RT.setTeacherStatus(b.dataset.id, status);
+    const act = b.dataset.act, id = b.dataset.id;
+    let res;
+    if (act === 'approve' || act === 'revoke') res = await CQC_RT.setTeacherStatus(id, act === 'approve' ? 'approved' : 'pending');
+    else res = await CQC_RT.setTeacherRole(id, act === 'promote' ? 'admin' : 'teacher');
     if (!res.ok) { alert('변경 실패: ' + res.error); b.disabled = false; return; }
-    const refreshed = await CQC_RT.listTeachers();
-    if (refreshed.ok) renderAdminList(refreshed.teachers);
+    refreshAdminTeachers();
+  }));
+}
+
+async function refreshAdminClasses() {
+  const res = await CQC_RT.adminListClasses();
+  const host = document.getElementById('adminClasses');
+  if (!host) return;
+  if (!res.ok) { host.innerHTML = `<div class="list-empty">${escapeHtml(res.error)}</div>`; return; }
+  renderAdminClasses(res.classes);
+}
+
+function renderAdminClasses(classes) {
+  const host = document.getElementById('adminClasses');
+  if (!host) return;
+  if (!classes.length) { host.innerHTML = '<div class="list-empty">만들어진 학급이 없어요.</div>'; return; }
+  const isSuper = rtTeacherRole === 'superadmin';
+  host.innerHTML = classes.map(c => `
+    <div class="admin-row">
+      <div class="admin-who">
+        <div class="admin-name">학급 ${escapeHtml(c.class_code)} · 🔍 ${escapeHtml(c.topic || '주제 없음')}</div>
+        <div class="admin-meta">모둠 ${c.groups}개 · 질문 ${c.cards}개 · ${escapeHtml(c.teacher || '?')}</div>
+      </div>
+      <div class="admin-action">
+        ${isSuper ? `<button class="btn btn-secondary admin-btn admin-del" data-code="${escapeHtml(c.class_code)}">🗑 삭제</button>` : '<span class="admin-self">보기 전용</span>'}
+      </div>
+    </div>`).join('');
+
+  host.querySelectorAll('.admin-del').forEach(b => b.addEventListener('click', async () => {
+    const code = b.dataset.code;
+    if (!confirm(`학급 ${code}와 그 안의 모든 모둠·질문을 삭제할까요? 되돌릴 수 없어요.`)) return;
+    b.disabled = true;
+    const res = await CQC_RT.adminDeleteClass(code);
+    if (!res.ok) { alert('삭제 실패: ' + res.error); b.disabled = false; return; }
+    refreshAdminClasses();
   }));
 }
 

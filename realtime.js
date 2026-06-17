@@ -62,6 +62,27 @@ const CQC_RT = (() => {
     return error ? { ok: false, error: error.message } : { ok: true };
   }
 
+  // 역할 변경 (teacher <-> admin) — superadmin
+  async function setTeacherRole(userId, role) {
+    const { error } = await getClient().rpc('cqc_set_teacher_role', {
+      p_user_id: userId, p_role: role
+    });
+    return error ? { ok: false, error: error.message } : { ok: true };
+  }
+
+  // 전체 학급 목록 — admin/superadmin
+  async function adminListClasses() {
+    const { data, error } = await getClient().rpc('cqc_admin_list_classes');
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, classes: data || [] };
+  }
+
+  // 학급 삭제 — superadmin
+  async function adminDeleteClass(classCode) {
+    const { error } = await getClient().rpc('cqc_admin_delete_class', { p_class_code: classCode });
+    return error ? { ok: false, error: error.message } : { ok: true };
+  }
+
   // ── 교사: 내가 만든 학급 목록 ──
   async function myClasses() {
     const { data, error } = await getClient().rpc('cqc_my_classes');
@@ -125,7 +146,7 @@ const CQC_RT = (() => {
   return {
     isConfigured,
     getTeacher, teacherLoginGoogle, teacherLogout, teacherStatus,
-    listTeachers, setTeacherStatus,
+    listTeachers, setTeacherStatus, setTeacherRole, adminListClasses, adminDeleteClass,
     myClasses, classResults, createClass, classGroups, board,
     addQuestion, editQuestion, deleteQuestion
   };
