@@ -9,6 +9,62 @@
 </head>
 <body>
 
+<!-- 홈 화면 — 입구 분리 (혼자 / 함께 / 정리 / 선생님) -->
+<div class="home-screen" id="homeScreen" hidden>
+  <div class="home-inner">
+    <h1 class="home-title">🔍 개념 질문 카드</h1>
+    <p class="home-sub">IB PYP 7개 핵심 개념으로 <b>탐구 질문</b>을 만들고 분류하는 도구 · 초등 5–6학년</p>
+
+    <h2 class="home-track">🧭 혼자 하기 <span class="home-track-sub">1인 · 오프라인</span></h2>
+    <div class="home-grid">
+      <button class="home-card t-solo" data-entry="local">
+        <div class="home-card-ic">📝</div>
+        <div class="home-card-nm">개념 질문 카드 (1인)</div>
+        <div class="home-card-dc">혼자 단어를 모으고 질문을 만들어 7개 개념으로 분류, 탐구 질문까지 완성</div>
+        <div class="home-card-be">LocalStorage 자동 저장 · 이어하기 <span id="homeResumeBadge"></span></div>
+      </button>
+    </div>
+
+    <h2 class="home-track">💬 함께 하기 <span class="home-track-sub">실시간 모둠</span></h2>
+    <div class="home-grid">
+      <button class="home-card t-live" data-entry="student">
+        <div class="home-card-ic">👥</div>
+        <div class="home-card-nm">모둠 실시간 질문 만들기 (학생 입장)</div>
+        <div class="home-card-dc">선생님께 받은 코드로 들어가 모둠·자리를 고르고, 친구들과 실시간으로 질문 만들기</div>
+        <div class="home-card-be">Supabase(qar-board) · 로그인 없음 · 1인 1기기</div>
+      </button>
+    </div>
+
+    <h2 class="home-track">🧺 학급 정리 <span class="home-track-sub">교사 화면</span></h2>
+    <div class="home-grid">
+      <button class="home-card t-gather" data-entry="gather">
+        <div class="home-card-ic">🧺</div>
+        <div class="home-card-nm">모둠 결과 모아 탐구목록 만들기</div>
+        <div class="home-card-dc">모둠별 JSON을 불러와 모든 질문을 한 보드로 모으고, 학급이 함께 분류·탐구 질문 선정</div>
+        <div class="home-card-be">교사 화면(전자칠판) · 로컬</div>
+      </button>
+    </div>
+
+    <details class="home-teacher">
+      <summary>🧑‍🏫 선생님용 <span class="home-teacher-hint">(Google 로그인 · 학급 개설·관리)</span></summary>
+      <div class="home-grid">
+        <button class="home-card t-teacher" data-entry="teacher">
+          <div class="home-card-ic">➕</div>
+          <div class="home-card-nm">학급 만들기 · 내 학급(코드·QR)</div>
+          <div class="home-card-dc">학급을 개설해 모둠 코드를 만들고, 입장 링크·QR을 다시 보거나 결과를 내려받기</div>
+          <div class="home-card-be">Google 로그인 · 승인된 교사</div>
+        </button>
+        <button class="home-card t-admin" data-entry="admin">
+          <div class="home-card-ic">👑</div>
+          <div class="home-card-nm">관리자 — 교사 승인</div>
+          <div class="home-card-dc">새로 가입한 선생님을 승인하거나 취소 (관리자·최고관리자 전용)</div>
+          <div class="home-card-be">Google 로그인 · admin/superadmin</div>
+        </button>
+      </div>
+    </details>
+  </div>
+</div>
+
 <div class="app-wrapper">
 
   <!-- 상단 헤더 -->
@@ -44,6 +100,7 @@
     </div>
     <div class="header-actions">
       <span class="autosave-badge" id="autosaveBadge">💾 자동저장</span>
+      <button class="btn-settings" id="btnHome">🏠 홈</button>
       <button class="btn-settings" id="btnQr">📱 QR 코드</button>
       <button class="btn-settings" id="btnImport">📥 불러오기</button>
       <button class="btn-settings" id="btnGather">🧺 모둠 모으기</button>

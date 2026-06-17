@@ -38,10 +38,11 @@ let rtDragging = false;     // 드래그 진행 중 (폴링 갱신 보류용)
 let pendingRemote = false;  // 상호작용 중 들어온 갱신 보류 플래그
 let pendingCards = null;    // 보류된 최신 보드 카드
 let lastBoardSig = '';      // 마지막 적용한 보드 서명 (불필요 재렌더 방지)
+let appRealtime = false;    // 이번 진입의 실행 모드 (홈/URL에서 결정)
 
-// realtime 모드 + 연결 설정이 모두 갖춰졌을 때만 true
+// 실시간 모드로 들어왔고 연결 설정도 갖춰졌을 때만 true
 function isRealtime() {
-  return CONFIG.BACKEND_MODE === 'realtime' && typeof CQC_RT !== 'undefined' && CQC_RT.isConfigured();
+  return appRealtime && typeof CQC_RT !== 'undefined' && CQC_RT.isConfigured();
 }
 
 // 방에 입장한 상태인지
@@ -1496,6 +1497,8 @@ function bindEvents() {
     e.target.value = '';
   });
 
+  document.getElementById('btnHome').addEventListener('click', goHome);
+
   document.getElementById('btnGather').addEventListener('click', () => {
     document.getElementById('fileGather').click();
   });
@@ -2001,6 +2004,79 @@ async function initRealtime() {
   renderRoomBar();
 }
 
+// ── 홈 화면 / 입구 라우팅 ─────────────────────────────
+function localQuestionCount() {
+  try { return (JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}').questions || []).length; }
+  catch (e) { return 0; }
+}
+
+function showHome() {
+  appRealtime = false;
+  stopPolling();
+  const home = document.getElementById('homeScreen');
+  const app = document.querySelector('.app-wrapper');
+  if (home) home.hidden = false;
+  if (app) app.style.display = 'none';
+  const badge = document.getElementById('homeResumeBadge');
+  if (badge) { const n = localQuestionCount(); badge.textContent = n ? `· 질문 ${n}개 이어하기` : ''; }
+}
+
+function hideHome() {
+  const home = document.getElementById('homeScreen');
+  const app = document.querySelector('.app-wrapper');
+  if (home) home.hidden = true;
+  if (app) app.style.display = '';
+}
+
+function goHome() {
+  stopPolling();
+  rtAccessCode = null; rtSeat = null; rtClassCode = null; rtTopic = '';
+  rtEntryGroups = null; rtPendingAccess = null;
+  showHome();
+}
+
+// 진입 — entry: local | gather | student | realtime | teacher | admin
+function enterApp(entry) {
+  hideHome();
+  if (entry === 'local' || entry === 'gather') {
+    appRealtime = false;
+    loadState();                  // 홈에서 다시 들어올 때 로컬 보드 복원
+    updateHeader();
+    switchPhase(1);
+    updatePhaseBadges();
+    if (entry === 'gather') document.getElementById('fileGather')?.click();
+    else if (!state.unitMeta.unitTitle) setTimeout(() => document.getElementById('headerTopic')?.focus(), 100);
+    return;
+  }
+  // 실시간 기반
+  appRealtime = true;
+  state.questions = [];
+  switchPhase(1);
+  renderClassifyArea();
+  updatePhaseBadges();
+  initRealtime().then(() => {
+    if (entry === 'teacher' || entry === 'admin') {
+      renderRoomBar();
+      showTeacherArea();
+      if (entry === 'admin' && (rtTeacherRole === 'admin' || rtTeacherRole === 'superadmin')) openAdminPanel();
+    }
+  });
+}
+
+function routeEntry() {
+  const p = new URLSearchParams(location.search);
+  if (p.get('code')) return enterApp('student');     // 학생 QR/링크
+  if (p.has('admin')) return enterApp('admin');
+  if (p.has('rt') || p.has('realtime')) return enterApp('realtime');
+  if (CONFIG.BACKEND_MODE === 'realtime') return enterApp('realtime');
+  showHome();
+}
+
+function bindHome() {
+  document.querySelectorAll('.home-card').forEach(c =>
+    c.addEventListener('click', () => enterApp(c.dataset.entry)));
+}
+
 // ── 초기화 ────────────────────────────────────────────
 function init() {
   loadState();
@@ -2008,19 +2084,8 @@ function init() {
   bindEvents();
   bindHeaderEdit();
   updateHeader();
-  switchPhase(1);
-  updatePhaseBadges();
-
-  // 실시간 모드: 질문은 서버가 출처이므로 비우고, 교사 세션/저장된 입장 복원
-  if (isRealtime()) {
-    state.questions = [];
-    renderClassifyArea();
-    initRealtime();
-  }
-
-  if (!state.unitMeta.unitTitle) {
-    setTimeout(() => document.getElementById('headerTopic')?.focus(), 100);
-  }
+  bindHome();
+  routeEntry();
 }
 
 init();

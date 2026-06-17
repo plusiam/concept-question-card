@@ -4,9 +4,9 @@
 const CQC_RT = (() => {
   let client = null;
 
+  // 연결 정보·라이브러리가 있는지만 확인 (모드 on/off 판단은 script의 rtModeOn이 담당)
   function isConfigured() {
-    return CONFIG.BACKEND_MODE === 'realtime'
-      && !!CONFIG.SUPABASE_URL
+    return !!CONFIG.SUPABASE_URL
       && !!CONFIG.SUPABASE_ANON_KEY
       && typeof supabase !== 'undefined';
   }
