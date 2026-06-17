@@ -457,25 +457,7 @@ body {
   padding-top: 4px;
 }
 
-/* QR 코드 모달 */
-.qr-image {
-  display: flex;
-  justify-content: center;
-  padding: 8px 0;
-}
-.qr-image svg {
-  width: 260px;
-  max-width: 100%;
-  height: auto;
-  display: block;
-}
-.qr-url {
-  text-align: center;
-  font-size: 12px;
-  color: var(--color-text-sub);
-  word-break: break-all;
-  line-height: 1.5;
-}
+/* QR 코드 폴백 (내 학급 QR 생성 실패 시) */
 .qr-fallback {
   font-size: 13px;
   color: var(--color-text-sub);

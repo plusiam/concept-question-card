@@ -1167,23 +1167,6 @@ function closeExportModal() {
   document.getElementById('exportModal').classList.add('hidden');
 }
 
-// ── QR 코드 모달 ─────────────────────────────────────
-function openQrModal() {
-  const host = document.getElementById('qrImage');
-  const urlEl = document.getElementById('qrUrl');
-  const url = window.location.href;
-  if (urlEl) urlEl.textContent = url;
-  if (host) {
-    host.innerHTML = makeQrSvg(url, 8, 2) ||
-      '<div class="qr-fallback">QR 코드를 불러오지 못했어요. 아래 주소를 직접 입력해 주세요.</div>';
-  }
-  document.getElementById('qrModal').classList.remove('hidden');
-}
-
-function closeQrModal() {
-  document.getElementById('qrModal').classList.add('hidden');
-}
-
 function importJSON(file) {
   if (state.questions.length > 0 || state.seeds.length > 0) {
     if (!confirm('지금 화면의 질문과 단어가 불러온 파일 내용으로 모두 바뀝니다. 계속할까요?')) return;
@@ -1455,11 +1438,6 @@ function bindEvents() {
 
   document.getElementById('btnSettings').addEventListener('click', openModal);
   document.getElementById('btnReset').addEventListener('click', resetAll);
-  document.getElementById('btnQr').addEventListener('click', openQrModal);
-  document.getElementById('btnQrClose').addEventListener('click', closeQrModal);
-  document.getElementById('qrModal').addEventListener('click', e => {
-    if (e.target === e.currentTarget) closeQrModal();
-  });
 
   document.getElementById('btnAggregate').addEventListener('click', () => {
     document.getElementById('fileAggregate').click();
@@ -1482,9 +1460,7 @@ function bindEvents() {
 
   document.getElementById('btnHome').addEventListener('click', goHome);
 
-  document.getElementById('btnGather').addEventListener('click', () => {
-    document.getElementById('fileGather').click();
-  });
+  // 🧺 모둠 모으기는 홈의 '학급 정리' 카드로 진입 (헤더 중복 버튼 제거)
   document.getElementById('fileGather').addEventListener('change', e => {
     if (e.target.files.length) gatherGroupResults(e.target.files);
     e.target.value = '';
@@ -2076,7 +2052,7 @@ function goHome() {
 // 헤더 버튼을 진입 모드에 맞게 노출 — 실시간에선 로컬 전용/오해 소지 버튼 숨김
 function applyHeaderMode() {
   // 실시간 모드에서 숨길 것: 로컬 파일 입출력·QR(앱주소)·로컬 초기화·자동저장 배지
-  const hideInRealtime = ['autosaveBadge', 'btnQr', 'btnImport', 'btnGather', 'btnAggregate', 'btnReset'];
+  const hideInRealtime = ['autosaveBadge', 'btnImport', 'btnAggregate', 'btnReset'];
   hideInRealtime.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = appRealtime ? 'none' : '';

@@ -101,10 +101,8 @@
     <div class="header-actions">
       <span class="autosave-badge" id="autosaveBadge">💾 자동저장</span>
       <button class="btn-settings" id="btnHome">🏠 홈</button>
-      <button class="btn-settings" id="btnQr">📱 QR 코드</button>
       <button class="btn-settings" id="btnImport">📥 불러오기</button>
-      <button class="btn-settings" id="btnGather">🧺 모둠 모으기</button>
-      <button class="btn-settings" id="btnAggregate">📊 모아보기</button>
+      <button class="btn-settings" id="btnAggregate">📊 학생 답안 보기</button>
       <button class="btn-settings" id="btnExport">📤 내보내기</button>
       <button class="btn-settings" id="btnSettings">⚙️ 설정</button>
       <button class="btn-settings" id="btnReset">🔄 새로 시작</button>
@@ -200,28 +198,13 @@
 <div class="aggregate-overlay hidden" id="aggregateView">
   <div class="aggregate-panel">
     <div class="aggregate-header">
-      <div class="aggregate-title">📊 모아보기 — 학급 탐구 지형도</div>
+      <div class="aggregate-title">📊 학생 답안 보기 — 학급 탐구 지형도</div>
       <div class="aggregate-header-actions">
         <button class="btn-settings" id="btnAggregateAnon">🙈 이름 가리기</button>
         <button class="btn-settings" id="btnAggregateClose">✕ 닫기</button>
       </div>
     </div>
     <div class="aggregate-body" id="aggregateBody"></div>
-  </div>
-</div>
-
-<!-- QR 코드 모달 -->
-<div class="modal-overlay hidden" id="qrModal">
-  <div class="modal-box modal-box-sm">
-    <div>
-      <div class="modal-title">📱 QR 코드로 접속</div>
-      <div class="modal-subtitle">학생이 휴대폰·태블릿 카메라로 QR 코드를 비추면 이 도구에 바로 들어와요.</div>
-    </div>
-    <div class="qr-image" id="qrImage"></div>
-    <div class="qr-url" id="qrUrl"></div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="btnQrClose">닫기</button>
-    </div>
   </div>
 </div>
 
