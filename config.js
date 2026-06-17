@@ -9,12 +9,6 @@ const CONFIG = {
   SUPABASE_URL: 'https://lsugarnnehkjduwbxgyw.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_r2PJNj8fNxq1S8twvmIX1Q_CUCRLnOY',
 
-  // Phase 0 단어 시드 풀 표시 여부
-  SEED_MODE: true,
-
-  // 학년 모드 ('5-6' | '3-4' | '1-2')
-  GRADE: '5-6',
-
   // 활성화할 핵심 개념 ID 배열 — null이면 7개 전체 표시
   // 예: ['change', 'connection', 'responsibility']
   ENABLED_CONCEPTS: null

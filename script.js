@@ -1119,20 +1119,9 @@ function exportJSON() {
     seeds: state.seeds,
     clusters: state.clusters
   };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
   const namePart = [state.unitMeta.unitTitle, state.unitMeta.groupName]
-    .map(s => (s || '').trim())
-    .filter(Boolean)
-    .join('_')
-    .replace(/[\/\\:*?"<>|]/g, '-') || '개념질문카드';
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${namePart}.json`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+    .map(s => (s || '').trim()).filter(Boolean).join('_') || '개념질문카드';
+  downloadJSON(data, namePart);
 }
 
 // ── 단계 인쇄 / PDF ───────────────────────────────────
@@ -1185,14 +1174,8 @@ function openQrModal() {
   const url = window.location.href;
   if (urlEl) urlEl.textContent = url;
   if (host) {
-    if (typeof qrcode === 'undefined') {
-      host.innerHTML = '<div class="qr-fallback">QR 코드를 불러오지 못했어요. 아래 주소를 직접 입력해 주세요.</div>';
-    } else {
-      const qr = qrcode(0, 'M');
-      qr.addData(url);
-      qr.make();
-      host.innerHTML = qr.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
-    }
+    host.innerHTML = makeQrSvg(url, 8, 2) ||
+      '<div class="qr-fallback">QR 코드를 불러오지 못했어요. 아래 주소를 직접 입력해 주세요.</div>';
   }
   document.getElementById('qrModal').classList.remove('hidden');
 }
@@ -1662,12 +1645,17 @@ function roomLink(code) {
   return location.origin + location.pathname + '?code=' + code;
 }
 
-function qrSvg(url) {
-  if (typeof qrcode === 'undefined') return '<div class="qr-fallback">QR 없음</div>';
+// QR SVG 생성 공통 헬퍼 (qrcode-generator). 라이브러리 없으면 null.
+function makeQrSvg(url, cellSize, margin) {
+  if (typeof qrcode === 'undefined') return null;
   const qr = qrcode(0, 'M');
   qr.addData(url);
   qr.make();
-  return qr.createSvgTag({ cellSize: 3, margin: 1, scalable: true });
+  return qr.createSvgTag({ cellSize, margin, scalable: true });
+}
+
+function qrSvg(url) {
+  return makeQrSvg(url, 3, 1) || '<div class="qr-fallback">QR 없음</div>';
 }
 
 async function openClassesPanel() {
@@ -2085,6 +2073,16 @@ function goHome() {
   showHome();
 }
 
+// 헤더 버튼을 진입 모드에 맞게 노출 — 실시간에선 로컬 전용/오해 소지 버튼 숨김
+function applyHeaderMode() {
+  // 실시간 모드에서 숨길 것: 로컬 파일 입출력·QR(앱주소)·로컬 초기화·자동저장 배지
+  const hideInRealtime = ['autosaveBadge', 'btnQr', 'btnImport', 'btnGather', 'btnAggregate', 'btnReset'];
+  hideInRealtime.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = appRealtime ? 'none' : '';
+  });
+}
+
 // 진입 — entry: local | gather | student | realtime | teacher | admin
 function enterApp(entry) {
   hideHome();
@@ -2092,6 +2090,7 @@ function enterApp(entry) {
     appRealtime = false;
     loadState();                  // 홈에서 다시 들어올 때 로컬 보드 복원
     updateHeader();
+    applyHeaderMode();
     switchPhase(1);
     updatePhaseBadges();
     if (entry === 'gather') document.getElementById('fileGather')?.click();
@@ -2100,6 +2099,7 @@ function enterApp(entry) {
   }
   // 실시간 기반
   appRealtime = true;
+  applyHeaderMode();
   state.questions = [];
   switchPhase(1);
   renderClassifyArea();

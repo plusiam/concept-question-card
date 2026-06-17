@@ -432,51 +432,6 @@ body {
   gap: 6px;
 }
 
-.form-label {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--color-text);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.form-label .required {
-  color: #EF4444;
-  font-size: 11px;
-}
-
-.form-label .optional {
-  color: var(--color-text-sub);
-  font-size: 11px;
-  font-weight: 400;
-}
-
-.form-input,
-.form-textarea {
-  width: 100%;
-  border: 1.5px solid var(--color-border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-family: var(--font-main);
-  font-size: 14px;
-  color: var(--color-text);
-  background: var(--color-bg);
-  outline: none;
-  transition: border-color 0.15s;
-}
-
-.form-input:focus,
-.form-textarea:focus {
-  border-color: var(--color-primary);
-  background: var(--color-surface);
-}
-
-.form-input::placeholder,
-.form-textarea::placeholder { color: #9CA3AF; }
-
-.form-textarea { resize: vertical; min-height: 70px; }
-
 /* 핵심 개념 선택 체크박스 그리드 */
 .concept-check-grid {
   display: grid;
@@ -695,20 +650,6 @@ body {
   color: var(--color-text);
 }
 
-/* ── Phase 안내 패널 (M2 이전 임시 표시) ── */
-.phase-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 300px;
-  gap: 12px;
-  color: var(--color-text-sub);
-}
-
-.phase-placeholder .placeholder-icon { font-size: 48px; }
-.phase-placeholder p { font-size: 15px; }
-
 /* ── 헤더 우측 액션 영역 ── */
 .header-actions {
   display: flex;
@@ -790,26 +731,6 @@ body {
   border-radius: 999px;
   padding: 2px 8px;
   word-break: keep-all;
-}
-
-.q-author-tag {
-  font-size: 11px;
-  background: rgba(0,0,0,0.05);
-  border-radius: var(--radius-pill);
-  padding: 1px 7px;
-  color: var(--color-text-sub);
-}
-
-.q-concept-tag {
-  font-size: 11px;
-  border-radius: var(--radius-pill);
-  padding: 1px 8px;
-  font-weight: 500;
-}
-
-.q-concept-tag.unclassified {
-  background: var(--color-border);
-  color: var(--color-text-sub);
 }
 
 .btn-icon {
@@ -920,43 +841,7 @@ body {
 }
 .picker-item:hover { opacity: 0.85; transform: scale(1.01); }
 
-/* ── Question Starts 아코디언 (M3) ── */
-.sidebar-accordion { display: flex; flex-direction: column; gap: 5px; }
-
-.accordion-header {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 7px 10px;
-  border-radius: 7px;
-  border: 1px solid;
-  font-family: var(--font-main);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  text-align: left;
-  transition: opacity 0.1s;
-}
-.accordion-header:hover { opacity: 0.85; }
-
-.accordion-arrow {
-  font-size: 10px;
-  transition: transform 0.2s;
-  flex-shrink: 0;
-}
-
-.accordion-item.open .accordion-arrow { transform: rotate(90deg); }
-
-.accordion-body {
-  display: none;
-  flex-direction: column;
-  gap: 4px;
-  padding: 4px 4px 4px 8px;
-}
-
-.accordion-item.open .accordion-body { display: flex; }
-
+/* 질문 시작어 칩 */
 .start-chip {
   text-align: left;
   background: var(--color-bg);
@@ -1032,16 +917,7 @@ body {
   padding: 0 6px;
 }
 
-/* ── Phase 1 레이아웃 ── */
-.phase1-layout {
-  display: grid;
-  grid-template-columns: 1fr 260px;
-  gap: 20px;
-  align-items: start;
-}
-
-.phase1-main { display: flex; flex-direction: column; gap: 20px; }
-
+/* ── Phase 1 입력 영역 ── */
 .input-area {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -1082,132 +958,14 @@ body {
   justify-content: flex-end;
 }
 
-.author-input {
-  flex: 1;
-  border: 1.5px solid var(--color-border);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-family: var(--font-main);
-  font-size: 13px;
-  outline: none;
-  color: var(--color-text);
-  background: var(--color-bg);
-  transition: border-color 0.15s;
-}
-
-.author-input:focus { border-color: var(--color-primary); background: var(--color-surface); }
-.author-input::placeholder { color: #9CA3AF; }
-
 .btn-add {
   padding: 8px 20px;
   white-space: nowrap;
   font-size: 14px;
 }
 
-.question-list-section {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  padding: 16px;
-}
-
-.list-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--color-text);
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.hint-text {
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--color-text-sub);
-}
-
-.hint-text.success { color: #16A34A; }
-
-.question-list { display: flex; flex-direction: column; gap: 8px; }
-
-.q-list-item {
-  border: 1.5px solid var(--color-border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  background: var(--color-bg);
-}
-
-.q-list-text {
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--color-text);
-  outline: none;
-  border-radius: 4px;
-  padding: 2px 4px;
-  word-break: keep-all;
-}
-
-.q-list-text:focus {
-  background: var(--color-surface);
-  box-shadow: 0 0 0 2px var(--color-primary);
-}
-
-.q-list-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.btn-delete-q { margin-left: auto; }
-
-/* ── Phase 1 사이드바 ── */
-.phase1-sidebar {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  padding: 16px;
-  position: sticky;
-  top: 120px;
-}
-
-.sidebar-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--color-text);
-  margin-bottom: 8px;
-}
-
-.sidebar-note {
-  font-size: 12px;
-  color: var(--color-text-sub);
-  line-height: 1.5;
-  margin-bottom: 12px;
-}
-
-.sidebar-concepts-preview {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.sidebar-concept-chip {
-  font-size: 12px;
-  padding: 5px 10px;
-  border-radius: 6px;
-  border: 1px solid;
-  font-weight: 500;
-}
-
 /* ── 반응형 (모바일) ── */
 @media (max-width: 768px) {
-  .phase1-layout { grid-template-columns: 1fr; }
-  .phase1-sidebar { position: static; }
   .unclassified-list .q-card { width: 100%; }
 }
 
@@ -1672,7 +1430,7 @@ body {
 .btn-room { padding: 6px 14px; }
 .room-seat b { color: #1E4E79; }
 .room-topic { font-size: 13px; color: #355; }
-.room-status { font-size: 13px; margin-left: auto; }
+.room-or { font-size: 13px; color: var(--color-text-sub); }
 .room-error { color: #B91C1C; font-size: 13px; margin-top: 8px; }
 
 /* 교사 영역 */
@@ -1683,7 +1441,7 @@ body {
 .room-teacher { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #BCD9F2; }
 .teacher-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; }
 .teacher-row label { font-size: 13px; color: #355; display: inline-flex; align-items: center; gap: 6px; }
-.room-text-input, .room-topic-input {
+.room-topic-input {
   border: 1px solid var(--color-border); border-radius: 8px; padding: 6px 10px; font-size: 14px; width: 160px;
 }
 .room-num-input {
