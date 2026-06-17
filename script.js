@@ -1620,10 +1620,14 @@ async function openClassesPanel() {
 
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   document.getElementById('btnClassesClose').addEventListener('click', () => overlay.remove());
-  // 링크 복사
-  overlay.querySelectorAll('.room-link-copy').forEach(b => b.addEventListener('click', () => {
-    navigator.clipboard?.writeText(b.dataset.link).then(() => { b.textContent = '복사됨'; setTimeout(() => b.textContent = '링크 복사', 1200); }).catch(() => {});
+  // 링크 복사 (JSON 버튼 제외)
+  overlay.querySelectorAll('.room-link-copy:not(.class-json-btn)').forEach(b => b.addEventListener('click', () => {
+    const label = b.textContent;
+    navigator.clipboard?.writeText(b.dataset.link).then(() => { b.textContent = '복사됨'; setTimeout(() => b.textContent = label, 1200); }).catch(() => {});
   }));
+  // JSON 저장
+  overlay.querySelectorAll('.class-json-btn').forEach(b => b.addEventListener('click', () =>
+    onDownloadClass(b.dataset.class, b.dataset.topic)));
 }
 
 function renderClassesList(classes) {
@@ -1633,6 +1637,14 @@ function renderClassesList(classes) {
       <div class="class-card-head">
         <span class="class-code-big">${escapeHtml(cls.class_code)}</span>
         <span class="class-topic">🔍 ${escapeHtml(cls.topic || '주제 없음')}</span>
+        <div class="class-card-actions">
+          <button class="room-link-copy" data-link="${roomLink(cls.class_code)}">🔗 수업 링크</button>
+          <button class="room-link-copy class-json-btn" data-class="${escapeHtml(cls.class_code)}" data-topic="${escapeHtml(cls.topic || '')}">📄 JSON 저장</button>
+        </div>
+      </div>
+      <div class="class-qr-row">
+        <div class="class-qr">${qrSvg(roomLink(cls.class_code))}</div>
+        <div class="class-qr-cap">수업 QR — 학생이 찍으면 모둠 고르기로 들어와요</div>
       </div>
       <div class="group-link-grid">
         ${cls.groups.map(g => `
@@ -1646,6 +1658,28 @@ function renderClassesList(classes) {
       </div>
     </div>
   `).join('');
+}
+
+// 결과물 JSON 다운로드
+function downloadJSON(obj, namePart) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (String(namePart).replace(/[\/\\:*?"<>|]/g, '-') || 'concept-question-card') + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function onDownloadClass(classCode, topic) {
+  const res = await CQC_RT.classResults(classCode);
+  if (!res.ok || !res.result) { alert('결과물을 불러오지 못했어요.'); return; }
+  downloadJSON({
+    app: 'concept-question-card', type: 'class-results', version: 1,
+    exportedAt: new Date().toISOString(), ...res.result
+  }, `학급${classCode}_${(topic || '').trim() || '결과'}`);
 }
 
 // ── 관리자 패널 (admin/superadmin) — 교사 승인 관리 ──

@@ -69,6 +69,13 @@ const CQC_RT = (() => {
     return { ok: true, classes: data || [] };
   }
 
+  // ── 교사: 학급 결과물(모둠별 질문) — JSON 내보내기용 ──
+  async function classResults(classCode) {
+    const { data, error } = await getClient().rpc('cqc_class_results', { p_class_code: classCode });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, result: data };
+  }
+
   // ── 교사: 학급(모둠 묶음) 개설 ──
   async function createClass(count, topic) {
     const { data, error } = await getClient().rpc('cqc_create_class', {
@@ -119,7 +126,7 @@ const CQC_RT = (() => {
     isConfigured,
     getTeacher, teacherLoginGoogle, teacherLogout, teacherStatus,
     listTeachers, setTeacherStatus,
-    myClasses, createClass, classGroups, board,
+    myClasses, classResults, createClass, classGroups, board,
     addQuestion, editQuestion, deleteQuestion
   };
 })();
