@@ -1231,6 +1231,66 @@ function importJSON(file) {
   reader.readAsText(file);
 }
 
+// ── 모둠 결과 모으기 (학급 전체 탐구목록 만들기) ───────
+// 여러 모둠/학급의 class-results JSON을 읽어 모든 질문을 한 보드로 합침 (로컬)
+function gatherGroupResults(files) {
+  const list = Array.from(files);
+  const collected = [];
+  let topic = '';
+  let bad = 0;
+  let pending = list.length;
+
+  list.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        const groups = Array.isArray(data.groups) ? data.groups : null;
+        if (!groups) { bad++; }
+        else {
+          groups.forEach(g => {
+            if (!topic && g.topic) topic = g.topic;
+            (g.cards || []).forEach(c => {
+              if (c && c.text) collected.push({ text: c.text, group: g.group_no });
+            });
+          });
+        }
+      } catch (e) { bad++; }
+      if (--pending === 0) finishGather(collected, topic, bad);
+    };
+    reader.onerror = () => { bad++; if (--pending === 0) finishGather(collected, topic, bad); };
+    reader.readAsText(file);
+  });
+}
+
+function finishGather(items, topic, bad) {
+  if (!items.length) {
+    alert('불러온 질문이 없어요. \'내 학급 → JSON 저장\'으로 받은 모둠 결과 파일인지 확인해 주세요.');
+    return;
+  }
+  if (state.questions.length > 0 &&
+      !confirm(`모둠 질문 ${items.length}개를 불러옵니다. 지금 화면의 질문은 지워져요. 계속할까요?`)) return;
+
+  state.questions = items.map(it => ({
+    id: generateId(),
+    text: it.text,
+    conceptIds: [],
+    starred: false,
+    originWord: (it.group != null ? it.group + '모둠' : ''),
+    createdAt: new Date().toISOString()
+  }));
+  state.seeds = [];
+  state.clusters = [];
+  if (topic) state.unitMeta.unitTitle = topic;
+  expandedCardId = null;
+  scaffoldConceptId = null;
+  saveState();
+  updateHeader();
+  switchPhase(1);
+  updatePhaseBadges();
+  alert(`${items.length}개 질문을 모았어요${bad ? ` (읽지 못한 파일 ${bad}개 제외)` : ''}. 2단계에서 함께 분류하고 3단계에서 탐구 질문을 골라요.`);
+}
+
 // ── 전체 초기화 (새로 시작) ───────────────────────────
 function resetAll() {
   if (!confirm('모든 단어·묶음·질문·주제를 지우고 처음부터 새로 시작할까요? 이 동작은 되돌릴 수 없어요.')) return;
@@ -1433,6 +1493,14 @@ function bindEvents() {
   document.getElementById('fileImport').addEventListener('change', e => {
     const file = e.target.files[0];
     if (file) importJSON(file);
+    e.target.value = '';
+  });
+
+  document.getElementById('btnGather').addEventListener('click', () => {
+    document.getElementById('fileGather').click();
+  });
+  document.getElementById('fileGather').addEventListener('change', e => {
+    if (e.target.files.length) gatherGroupResults(e.target.files);
     e.target.value = '';
   });
 
