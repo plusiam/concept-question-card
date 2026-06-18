@@ -31,6 +31,7 @@ let rtPollTimer = null;     // 폴링 타이머
 let rtTeacher = null;       // 로그인된 교사 사용자
 let rtTeacherStatus = null; // 교사 승인 상태 ('approved' | 'pending')
 let rtTeacherRole = null;   // 교사 권한 ('superadmin' | 'admin' | 'teacher' | 'pending')
+let rtEntry = null;         // 이번 진입 종류 (teacher/admin/student… — 로그인 복귀용)
 let rtEntryGroups = null;   // 학급코드 입장 시 모둠 목록
 let rtSessions = null;      // 학반 로비: 오늘 수업 목록
 let rtLobbyClass = null;    // 로비 중인 학반 코드
@@ -2031,8 +2032,8 @@ function leaveRoom(msg) {
 // ── 교사 흐름 ──
 async function onTeacherLogin() {
   rtError = '';
-  // Google로 이동 → 승인된 페이지로 복귀 (복귀 후 initRealtime이 상태 복원)
-  const res = await CQC_RT.teacherLoginGoogle();
+  // Google로 이동 → 진입 종류(teacher/admin) 화면으로 복귀
+  const res = await CQC_RT.teacherLoginGoogle(rtEntry === 'admin' ? 'admin' : 'teacher');
   if (!res.ok) { rtError = '로그인 실패: ' + res.error; renderRoomBar(); showTeacherArea(); }
 }
 
@@ -2189,6 +2190,7 @@ function applyHeaderMode() {
 // 진입 — entry: local | gather | student | realtime | teacher | admin
 function enterApp(entry) {
   hideHome();
+  rtEntry = entry;
   if (entry === 'local' || entry === 'gather') {
     appRealtime = false;
     loadState();                  // 홈에서 다시 들어올 때 로컬 보드 복원
@@ -2211,7 +2213,9 @@ function enterApp(entry) {
     if (entry === 'teacher' || entry === 'admin') {
       renderRoomBar();
       showTeacherArea();
-      if (entry === 'admin' && (rtTeacherRole === 'admin' || rtTeacherRole === 'superadmin')) openAdminPanel();
+      const isAdmin = rtTeacherRole === 'admin' || rtTeacherRole === 'superadmin';
+      if (entry === 'admin' && isAdmin) openAdminPanel();
+      else if (entry === 'teacher' && rtTeacherStatus === 'approved') openManagePanel();  // 승인 교사 → 학반 관리 바로 열기
     }
   });
 }
@@ -2220,6 +2224,7 @@ function routeEntry() {
   const p = new URLSearchParams(location.search);
   if (p.get('code')) return enterApp('student');     // 학생 QR/링크
   if (p.has('admin')) return enterApp('admin');
+  if (p.has('teacher') || p.has('manage')) return enterApp('teacher');
   if (p.has('rt') || p.has('realtime')) return enterApp('realtime');
   if (CONFIG.BACKEND_MODE === 'realtime') return enterApp('realtime');
   showHome();

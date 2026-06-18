@@ -27,11 +27,13 @@ const CQC_RT = (() => {
     return data?.session?.user || null;
   }
 
-  // Google 로그인 — 현재 페이지로 돌아오게 리다이렉트
-  async function teacherLoginGoogle() {
+  // Google 로그인 — 로그인 후 returnParam(예: 'teacher'/'admin') 화면으로 복귀
+  async function teacherLoginGoogle(returnParam) {
+    const base = window.location.origin + window.location.pathname;
+    const redirectTo = returnParam ? base + '?' + returnParam : base;
     const { error } = await getClient().auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.href.split('#')[0] }
+      options: { redirectTo }
     });
     if (error) return { ok: false, error: error.message };
     return { ok: true }; // 페이지가 구글로 이동했다가 돌아옴
