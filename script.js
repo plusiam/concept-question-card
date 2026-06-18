@@ -44,6 +44,13 @@ let pendingCards = null;    // 보류된 최신 보드 카드
 let lastBoardSig = '';      // 마지막 적용한 보드 서명 (불필요 재렌더 방지)
 let appRealtime = false;    // 이번 진입의 실행 모드 (홈/URL에서 결정)
 let teacherConsole = false; // 교사/관리자 진입 — 학생 보드 대신 선생님 콘솔 표시 중
+let watchSession = null;    // 교사 관전 중인 오늘 수업 코드 (null=관전 아님)
+let watchTitle = '';        // 관전 중인 수업 제목
+let watchGroups = [];       // 최신 모둠별 데이터 [{group_no, access_code, topic, cards:[]}]
+let watchView = 'grid';     // 'grid'(전체) | 'single'(한 모둠 크게)
+let watchIndex = 0;         // single 보기의 현재 모둠 인덱스
+let watchTimer = null;      // 관전 폴링 타이머
+let watchSig = '';          // 마지막 적용 서명 (불필요 재렌더 방지)
 
 // 실시간 모드로 들어왔고 연결 설정도 갖춰졌을 때만 true
 function isRealtime() {
@@ -1793,6 +1800,10 @@ async function onManageAction(e) {
     navigator.clipboard?.writeText(b.dataset.link).then(() => { const t=b.textContent; b.textContent='복사됨'; setTimeout(()=>b.textContent=t,1200); });
     return;
   }
+  if (act === 'watch') {
+    openWatch(b.dataset.sess, b.dataset.title);
+    return;
+  }
   if (act === 'sessave') {
     onDownloadSession(b.dataset.sess, b.dataset.title);
     return;
@@ -1825,12 +1836,106 @@ async function loadSessions(classCode, keepOpen) {
     <div class="mg-session">
       <span class="group-link-code">${escapeHtml(s.session_code)}</span>
       <span class="mg-session-meta">${escapeHtml(s.session_title || '(제목 없음)')}${s.topic ? ' · 🔍' + escapeHtml(s.topic) : ''} · 모둠 ${s.groups}</span>
+      <button class="room-link-copy mg-act" data-act="watch" data-sess="${escapeHtml(s.session_code)}" data-title="${escapeHtml(s.session_title || '')}">👀 관전</button>
       <button class="room-link-copy mg-act" data-act="seslink" data-link="${roomLink(s.session_code)}">🔗 수업 링크</button>
       <button class="room-link-copy mg-act" data-act="sessave" data-sess="${escapeHtml(s.session_code)}" data-title="${escapeHtml(s.session_title || '')}">📄 결과 저장</button>
       <button class="room-link-copy mg-act" data-act="sesrename" data-sess="${escapeHtml(s.session_code)}" data-code="${classCode}" data-title="${escapeHtml(s.session_title || '')}">이름 바꾸기</button>
       <button class="room-link-copy mg-act" data-act="sesdel" data-sess="${escapeHtml(s.session_code)}" data-code="${classCode}" data-title="${escapeHtml(s.session_title || '')}">삭제</button>
     </div>`).join('');
   host.querySelectorAll('.mg-act').forEach(b => b.addEventListener('click', onManageAction));
+}
+
+// ── 교사 관전 (실시간 모둠 둘러보기 · 읽기 전용) ────────
+// cqc_class_results(수업코드)를 폴링 — 그 수업의 모든 모둠 질문을 교사 소유 확인하에 한 번에 받아 표시.
+// 분류·별표는 학생 기기 로컬이라 서버에 없음 → 관전엔 질문 글 + 자리번호만 보임.
+async function openWatch(sessionCode, title) {
+  watchSession = sessionCode;
+  watchTitle = title || '오늘 수업';
+  watchView = 'grid'; watchIndex = 0; watchGroups = []; watchSig = '';
+  document.getElementById('watchOverlay')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'watchOverlay';
+  ov.className = 'watch-overlay';
+  ov.innerHTML = `
+    <div class="watch-panel">
+      <div class="watch-header">
+        <div class="watch-title">👀 관전 — ${escapeHtml(watchTitle)}</div>
+        <div class="watch-header-actions">
+          <button class="btn-settings" id="btnWatchView">🔭 한 모둠 크게</button>
+          <button class="btn-settings" id="btnWatchClose">✕ 닫기</button>
+        </div>
+      </div>
+      <div class="watch-body" id="watchBody"><div class="list-empty">불러오는 중…</div></div>
+    </div>`;
+  document.body.appendChild(ov);
+  document.getElementById('btnWatchClose').addEventListener('click', closeWatch);
+  document.getElementById('btnWatchView').addEventListener('click', toggleWatchView);
+  await watchPoll();                                   // 즉시 1회
+  watchTimer = setInterval(watchPoll, POLL_MS);        // 학생과 같은 2.5초 주기
+}
+
+function closeWatch() {
+  if (watchTimer) { clearInterval(watchTimer); watchTimer = null; }
+  document.getElementById('watchOverlay')?.remove();
+  watchSession = null; watchGroups = [];
+}
+
+async function watchPoll() {
+  if (!watchSession) return;
+  const res = await CQC_RT.classResults(watchSession);
+  if (!res.ok) return;                                 // 일시 오류면 다음 폴링에서 갱신
+  watchGroups = (res.result && res.result.groups) ? res.result.groups : [];
+  renderWatch();
+}
+
+function toggleWatchView() {
+  watchView = watchView === 'grid' ? 'single' : 'grid';
+  watchSig = '';
+  const b = document.getElementById('btnWatchView');
+  if (b) b.textContent = watchView === 'grid' ? '🔭 한 모둠 크게' : '🔲 전체 보기';
+  renderWatch();
+}
+
+function watchGroupHtml(g, big) {
+  const cards = g.cards || [];
+  const list = cards.length
+    ? cards.map(c => `<div class="watch-q"><span class="watch-q-seat">✍ ${c.author_seat}번</span>${escapeHtml(c.text)}</div>`).join('')
+    : '<div class="watch-empty">아직 질문이 없어요</div>';
+  return `
+    <div class="watch-group${big ? ' watch-group-big' : ''}">
+      <div class="watch-group-head">${g.group_no}모둠 <span class="watch-q-count">질문 ${cards.length}</span>${g.topic ? `<span class="watch-topic">🔍 ${escapeHtml(g.topic)}</span>` : ''}</div>
+      <div class="watch-q-list">${list}</div>
+    </div>`;
+}
+
+function renderWatch() {
+  const body = document.getElementById('watchBody');
+  if (!body) return;
+  if (!watchGroups.length) {
+    if (watchSig === 'empty') return;
+    watchSig = 'empty';
+    body.innerHTML = '<div class="list-empty">아직 모둠이 없어요. 이 수업에 학생이 들어오면 보여요.</div>';
+    return;
+  }
+  if (watchIndex >= watchGroups.length) watchIndex = 0;
+  const sig = watchView + ':' + watchIndex + ':' +
+    watchGroups.map(g => g.group_no + '#' + (g.cards || []).map(c => c.author_seat + c.text).join('|')).join('~');
+  if (sig === watchSig) return;
+  watchSig = sig;
+  if (watchView === 'single') {
+    const g = watchGroups[watchIndex];
+    body.innerHTML = `
+      <div class="watch-nav">
+        <button class="btn-settings" id="watchPrev">◀ 이전</button>
+        <span class="watch-nav-label">${g.group_no}모둠 (${watchIndex + 1}/${watchGroups.length})</span>
+        <button class="btn-settings" id="watchNext">다음 ▶</button>
+      </div>
+      ${watchGroupHtml(g, true)}`;
+    document.getElementById('watchPrev')?.addEventListener('click', () => { watchIndex = (watchIndex - 1 + watchGroups.length) % watchGroups.length; watchSig = ''; renderWatch(); });
+    document.getElementById('watchNext')?.addEventListener('click', () => { watchIndex = (watchIndex + 1) % watchGroups.length; watchSig = ''; renderWatch(); });
+  } else {
+    body.innerHTML = `<div class="watch-grid">${watchGroups.map(g => watchGroupHtml(g, false)).join('')}</div>`;
+  }
 }
 
 async function openAdminPanel() {
@@ -2223,6 +2328,7 @@ function hideHome() {
 
 function goHome() {
   stopPolling();
+  closeWatch();   // 관전 중이었으면 폴링·오버레이 정리
   rtAccessCode = null; rtSeat = null; rtClassCode = null; rtTopic = '';
   rtFacilitatorSeat = null;
   rtEntryGroups = null; rtPendingAccess = null; rtSessions = null; rtLobbyClass = null;
