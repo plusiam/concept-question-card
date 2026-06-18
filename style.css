@@ -1375,6 +1375,11 @@ body {
 }
 .home-teacher > summary::-webkit-details-marker { display: none; }
 .home-teacher-hint { font-weight: 400; font-size: 12px; color: var(--color-text-sub); }
+.home-teacher-guide {
+  font-size: 13px; line-height: 1.6; color: var(--color-text-sub);
+  background: var(--color-bg); border-radius: 8px; padding: 8px 12px; margin: 0 0 12px;
+}
+.home-teacher-guide b { color: var(--color-text); }
 .home-teacher[open] > summary { border-bottom: 1px solid var(--color-border); margin-bottom: 12px; }
 .home-teacher .home-grid { padding-bottom: 14px; }
 /* 넓은 화면: 선생님용 카드 2개 나란히 */
