@@ -147,6 +147,18 @@ const CQC_RT = (() => {
     return { ok: true, classCode: data.class_code, count: data.count };
   }
 
+  // ── 학생 로비: 학반 코드(C-XXXX) → 학반 확인 + 오늘 수업 목록 ──
+  async function getClass(classCode) {
+    const { data, error } = await getClient().rpc('cqc_get_class', { p_class_code: classCode });
+    if (error || !data || !data.ok) return { ok: false };
+    return { ok: true, classLabel: data.class_label };
+  }
+  async function publicSessions(classCode) {
+    const { data, error } = await getClient().rpc('cqc_public_sessions', { p_class_code: classCode });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, sessions: data || [] };
+  }
+
   // ── 학생: 학급코드 → 모둠 목록 ──
   async function classGroups(classCode) {
     const { data, error } = await getClient().rpc('cqc_class', { p_code: classCode });
@@ -190,6 +202,7 @@ const CQC_RT = (() => {
     listTeachers, setTeacherStatus, setTeacherRole, adminListClasses, adminDeleteClass,
     classCreate, classList, classRename, classDelete,
     sessionOpen, sessionList, sessionRename, sessionDelete,
+    getClass, publicSessions,
     myClasses, classResults, createClass, classGroups, board,
     addQuestion, editQuestion, deleteQuestion
   };

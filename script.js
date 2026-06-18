@@ -31,6 +31,9 @@ let rtTeacher = null;       // 로그인된 교사 사용자
 let rtTeacherStatus = null; // 교사 승인 상태 ('approved' | 'pending')
 let rtTeacherRole = null;   // 교사 권한 ('superadmin' | 'admin' | 'teacher' | 'pending')
 let rtEntryGroups = null;   // 학급코드 입장 시 모둠 목록
+let rtSessions = null;      // 학반 로비: 오늘 수업 목록
+let rtLobbyClass = null;    // 로비 중인 학반 코드
+let rtLobbyLabel = '';      // 로비 중인 학반 이름
 let rtPendingAccess = null; // 자리 고르기 대기 중인 모둠 코드
 let rtCreated = null;       // 방금 개설한 학급 정보 {classCode, count}
 let rtError = '';           // 방 바 에러 메시지
@@ -1519,6 +1522,18 @@ function renderRoomBar() {
         </div>
         <button class="btn btn-secondary btn-room" id="btnSeatCancel">취소</button>
       </div>`;
+  } else if (rtSessions) {
+    html = `
+      <div class="room-bar-group">
+        <span class="room-bar-label">${escapeHtml(rtLobbyLabel || '학반')} — 오늘 수업을 골라요</span>
+        <div class="group-grid">
+          ${rtSessions.length
+            ? rtSessions.map(s =>
+                `<button class="group-btn ses-pick" data-sess="${escapeHtml(s.session_code)}">${escapeHtml(s.session_title || '수업')}${s.topic ? '<br><small>🔍' + escapeHtml(s.topic) + '</small>' : ''}</button>`).join('')
+            : '<span class="room-or">아직 열린 수업이 없어요. 선생님을 기다려요.</span>'}
+        </div>
+        <button class="btn btn-secondary btn-room" id="btnSessionCancel">취소</button>
+      </div>`;
   } else if (rtEntryGroups) {
     html = `
       <div class="room-bar-group">
@@ -1533,7 +1548,7 @@ function renderRoomBar() {
     html = `
       <div class="room-bar-out">
         <span class="room-bar-label">👥 모둠 실시간</span>
-        <input id="roomCodeInput" class="room-code-input" maxlength="4" inputmode="numeric" placeholder="코드 4자리">
+        <input id="roomCodeInput" class="room-code-input" maxlength="12" placeholder="학반·수업 코드">
         <button class="btn btn-primary btn-room" id="btnJoinRoom">입장</button>
         <button class="room-teacher-toggle" id="btnTeacherToggle">교사용 ▾</button>
       </div>
@@ -1598,8 +1613,10 @@ function bindRoomBar() {
   }));
   document.querySelectorAll('.seat-btn').forEach(b => b.addEventListener('click', () =>
     enterRoom(rtPendingAccess, parseInt(b.dataset.seat))));
+  document.querySelectorAll('.ses-pick').forEach(b => b.addEventListener('click', () => onPickSession(b.dataset.sess)));
   document.getElementById('btnSeatCancel')?.addEventListener('click', () => { rtPendingAccess = null; renderRoomBar(); });
   document.getElementById('btnGroupCancel')?.addEventListener('click', () => { rtEntryGroups = null; renderRoomBar(); });
+  document.getElementById('btnSessionCancel')?.addEventListener('click', () => { rtSessions = null; rtLobbyClass = null; renderRoomBar(); });
 
   document.getElementById('btnTeacherToggle')?.addEventListener('click', () => {
     const a = document.getElementById('teacherArea');
@@ -1969,15 +1986,35 @@ function renderAdminClasses(classes) {
 // ── 학생 입장 흐름 ──
 async function onJoinCode() {
   rtError = '';
-  const code = (document.getElementById('roomCodeInput')?.value || '').trim();
-  if (!/^[0-9]{4}$/.test(code)) { rtError = '코드 4자리를 입력해요.'; renderRoomBar(); return; }
+  const raw = (document.getElementById('roomCodeInput')?.value || '').trim().toUpperCase();
+  if (/^C-[A-Z0-9]{8}$/.test(raw)) return enterClassLobby(raw);   // 학반 코드 → 오늘 수업 고르기
+  if (/^[0-9]{4}$/.test(raw)) return enterByCode(raw);            // 수업/모둠 코드 → 모둠 고르기
+  rtError = '학반 코드(C-...) 또는 수업 코드(4자리)를 확인해요.'; renderRoomBar();
+}
+
+// 학반 로비: 학반 코드 → 오늘 수업 목록
+async function enterClassLobby(classCode) {
+  const g = await CQC_RT.getClass(classCode);
+  if (!g.ok) { rtError = '그런 학반이 없어요. 코드를 확인해 주세요.'; renderRoomBar(); return; }
+  const ps = await CQC_RT.publicSessions(classCode);
+  rtLobbyClass = classCode;
+  rtLobbyLabel = g.classLabel;
+  rtSessions = ps.ok ? ps.sessions : [];
+  renderRoomBar();
+}
+
+// 오늘 수업 선택 → 그 수업의 모둠 고르기로
+async function onPickSession(sessionCode) {
+  rtSessions = null;
+  await enterByCode(sessionCode);
+}
+
+// 4자리(수업/모둠) 코드 → 모둠 고르기 또는 자리 고르기
+async function enterByCode(code) {
   const cls = await CQC_RT.classGroups(code);
   if (cls.ok && cls.groups.length > 0) {
-    rtClassCode = code;
-    rtEntryGroups = cls.groups;
-    rtTopic = cls.groups[0].topic || '';
-    renderRoomBar();
-    return;
+    rtClassCode = code; rtEntryGroups = cls.groups; rtTopic = cls.groups[0].topic || '';
+    renderRoomBar(); return;
   }
   const bd = await CQC_RT.board(code);
   if (!bd.ok) { rtError = '그런 코드가 없어요. 다시 확인해 주세요.'; renderRoomBar(); return; }
@@ -1994,6 +2031,7 @@ async function enterRoom(accessCode, seat) {
   rtSeat = seat;
   rtPendingAccess = null;
   rtEntryGroups = null;
+  rtSessions = null;
   rtError = '';
   lastBoardSig = '';
   localStorage.setItem('cqc_rt_join', JSON.stringify({ code: accessCode, seat }));
@@ -2012,7 +2050,7 @@ async function enterRoom(accessCode, seat) {
 function leaveRoom(msg) {
   stopPolling();
   rtAccessCode = null; rtSeat = null; rtClassCode = null; rtTopic = '';
-  rtPendingAccess = null; rtEntryGroups = null;
+  rtPendingAccess = null; rtEntryGroups = null; rtSessions = null; rtLobbyClass = null;
   state.questions = [];
   localStorage.removeItem('cqc_rt_join');
   if (msg) rtError = msg;
@@ -2123,23 +2161,10 @@ async function initRealtime() {
     if (!inRoom()) renderRoomBar();
   }
 
-  // QR/링크 자동 입장 (?code=XXXX) — 학급코드면 모둠 선택, 모둠코드면 자리 선택으로 직행
-  const urlCode = new URLSearchParams(location.search).get('code');
-  if (urlCode && /^[0-9]{4}$/.test(urlCode)) {
-    const cls = await CQC_RT.classGroups(urlCode);
-    if (cls.ok && cls.groups.length > 0) {
-      rtClassCode = urlCode; rtEntryGroups = cls.groups; rtTopic = cls.groups[0].topic || '';
-      renderRoomBar(); return;
-    }
-    const bd = await CQC_RT.board(urlCode);
-    if (bd.ok) {
-      rtPendingAccess = urlCode;
-      rtMemberCount = bd.session?.member_count || 6;
-      rtTopic = bd.session?.topic || '';
-      rtClassCode = bd.session?.class_code || null;
-      renderRoomBar(); return;
-    }
-  }
+  // QR/링크 자동 입장 (?code=XXXX) — 학반(C-...)→오늘 수업 고르기 / 수업·모둠(4자리)→직행
+  const urlCode = (new URLSearchParams(location.search).get('code') || '').toUpperCase();
+  if (/^C-[A-Z0-9]{8}$/.test(urlCode)) { await enterClassLobby(urlCode); return; }
+  if (/^[0-9]{4}$/.test(urlCode)) { await enterByCode(urlCode); return; }
 
   const saved = localStorage.getItem('cqc_rt_join');
   if (saved) {
@@ -2180,7 +2205,7 @@ function hideHome() {
 function goHome() {
   stopPolling();
   rtAccessCode = null; rtSeat = null; rtClassCode = null; rtTopic = '';
-  rtEntryGroups = null; rtPendingAccess = null;
+  rtEntryGroups = null; rtPendingAccess = null; rtSessions = null; rtLobbyClass = null;
   showHome();
 }
 
