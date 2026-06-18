@@ -141,9 +141,11 @@ function addQuestion(text, originWord) {
 
 function deleteQuestion(id) {
   if (isRealtime()) {
-    state.questions = state.questions.filter(q => q.id !== id); // 낙관적 제거
-    saveClassMap();
-    CQC_RT.deleteQuestion(rtAccessCode, id, rtSeat).then(() => pollNow());
+    state.questions = state.questions.filter(q => q.id !== id); // 낙관적 제거(화면)
+    CQC_RT.deleteQuestion(rtAccessCode, id, rtSeat).then(res => {
+      if (res && res.ok) saveClassMap();  // 성공 시에만 분류 맵 갱신 (실패면 폴링이 분류 보존하며 복원)
+      pollNow();
+    });
     return;
   }
   state.questions = state.questions.filter(q => q.id !== id);
@@ -1660,7 +1662,6 @@ async function onDownloadSession(sessionCode, title) {
   }, `수업${sessionCode}_${(title || '').trim() || '결과'}`);
 }
 
-// ── 관리자 패널 (admin/superadmin) — 교사 승인 관리 ──
 // ── 교사 관리 패널 (학반 만들기 / 내 학반 → 오늘 수업·QR·이름·삭제) ──
 async function openManagePanel() {
   document.getElementById('manageOverlay')?.remove();
@@ -1779,6 +1780,14 @@ async function onManageAction(e) {
     onDownloadSession(b.dataset.sess, b.dataset.title);
     return;
   }
+  if (act === 'sesrename') {
+    const nv = prompt('수업 제목', b.dataset.title);
+    if (nv == null || !nv.trim()) return;
+    const r = await CQC_RT.sessionRename(b.dataset.sess, nv.trim(), null);
+    if (!r.ok) return alert('변경 실패: ' + r.error);
+    loadSessions(b.dataset.code, true);
+    return;
+  }
   if (act === 'sesdel') {
     if (!confirm(`'${b.dataset.title || b.dataset.sess}' 수업을 삭제할까요?`)) return;
     const r = await CQC_RT.sessionDelete(b.dataset.sess);
@@ -1801,6 +1810,7 @@ async function loadSessions(classCode, keepOpen) {
       <span class="mg-session-meta">${escapeHtml(s.session_title || '(제목 없음)')}${s.topic ? ' · 🔍' + escapeHtml(s.topic) : ''} · 모둠 ${s.groups}</span>
       <button class="room-link-copy mg-act" data-act="seslink" data-link="${roomLink(s.session_code)}">🔗 수업 링크</button>
       <button class="room-link-copy mg-act" data-act="sessave" data-sess="${escapeHtml(s.session_code)}" data-title="${escapeHtml(s.session_title || '')}">📄 결과 저장</button>
+      <button class="room-link-copy mg-act" data-act="sesrename" data-sess="${escapeHtml(s.session_code)}" data-code="${classCode}" data-title="${escapeHtml(s.session_title || '')}">이름 바꾸기</button>
       <button class="room-link-copy mg-act" data-act="sesdel" data-sess="${escapeHtml(s.session_code)}" data-code="${classCode}" data-title="${escapeHtml(s.session_title || '')}">삭제</button>
     </div>`).join('');
   host.querySelectorAll('.mg-act').forEach(b => b.addEventListener('click', onManageAction));
@@ -2132,6 +2142,7 @@ function goHome() {
   stopPolling();
   rtAccessCode = null; rtSeat = null; rtClassCode = null; rtTopic = '';
   rtEntryGroups = null; rtPendingAccess = null; rtSessions = null; rtLobbyClass = null;
+  rtError = ''; state.questions = [];
   showHome();
 }
 

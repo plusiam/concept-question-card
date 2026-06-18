@@ -1423,15 +1423,8 @@ body {
 .room-teacher { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #BCD9F2; }
 .teacher-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; }
 .teacher-row label { font-size: 13px; color: #355; display: inline-flex; align-items: center; gap: 6px; }
-.room-topic-input {
-  border: 1px solid var(--color-border); border-radius: 8px; padding: 6px 10px; font-size: 14px; width: 160px;
-}
 .room-num-input {
   width: 56px; border: 1px solid var(--color-border); border-radius: 8px; padding: 6px 8px; font-size: 14px;
-}
-.room-created {
-  margin-top: 8px; font-size: 13px; color: #166534;
-  background: #DCFCE7; border-radius: 8px; padding: 8px 10px;
 }
 .room-pending { font-size: 13px; color: #92400E; background: #FEF3C7; border-radius: 8px; padding: 6px 10px; }
 
@@ -1469,8 +1462,7 @@ body {
 .mg-session-meta { flex: 1; min-width: 0; font-size: 13px; color: var(--color-text-sub); }
 .list-empty.small { font-size: 12px; padding: 6px 0; }
 
-/* ── 내 학급 콘솔 (링크 + QR) ── */
-.classes-list { display: flex; flex-direction: column; gap: 14px; max-height: 60vh; overflow-y: auto; margin: 8px 0; }
+/* ── 학반 카드 (교사 관리 패널에서 재사용) ── */
 .class-card { border: 1px solid var(--color-border); border-radius: 12px; padding: 12px; }
 .class-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .class-code-big {
@@ -1483,14 +1475,6 @@ body {
 .class-qr { width: 110px; height: 110px; flex-shrink: 0; }
 .class-qr svg { width: 100%; height: 100%; }
 .class-qr-cap { font-size: 12px; color: var(--color-text-sub); }
-.group-link-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
-.group-link-item {
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  border: 1px solid var(--color-border); border-radius: 10px; padding: 8px;
-}
-.group-link-qr { width: 84px; height: 84px; }
-.group-link-qr svg { width: 100%; height: 100%; }
-.group-link-no { font-weight: 700; font-size: 13px; }
 .group-link-code { font-family: monospace; font-size: 14px; letter-spacing: 1px; color: #1E4E79; }
 .room-link-copy {
   font-size: 11px; border: 1px solid var(--color-border); background: #fff;
