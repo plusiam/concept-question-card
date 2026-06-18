@@ -180,6 +180,12 @@ const CQC_RT = (() => {
     return error ? { ok: false, error: error.message } : { ok: true };
   }
 
+  // 모둠 사회자 맡기 (내 자리를 사회자로 지정)
+  async function setFacilitator(accessCode, seat) {
+    const { error } = await getClient().rpc('cqc_set_facilitator', { p_code: accessCode, p_seat: seat });
+    return error ? { ok: false, error: error.message } : { ok: true };
+  }
+
   return {
     isConfigured,
     getTeacher, teacherLoginGoogle, teacherLogout, teacherStatus,
@@ -188,6 +194,6 @@ const CQC_RT = (() => {
     sessionOpen, sessionList, sessionRename, sessionDelete,
     getClass, publicSessions, classResults,
     classGroups, board,
-    addQuestion, editQuestion, deleteQuestion
+    addQuestion, editQuestion, deleteQuestion, setFacilitator
   };
 })();

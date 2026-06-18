@@ -24,6 +24,7 @@ const POLL_MS = 2500;       // think_gears와 동일한 폴링 주기
 let rtAccessCode = null;    // 현재 입장한 모둠 접속코드 (null=미입장)
 let rtClassCode = null;     // 학급 코드 (있으면)
 let rtSeat = null;          // 내 자리번호 (author_seat)
+let rtFacilitatorSeat = null; // 이 모둠의 사회자 자리
 let rtTopic = '';           // 방 주제
 let rtMemberCount = 6;      // 자리 수
 let rtPollTimer = null;     // 폴링 타이머
@@ -52,9 +53,14 @@ function inRoom() {
   return isRealtime() && !!rtAccessCode;
 }
 
-// 질문이 내 것인지 (실시간: 내 자리 / 로컬: 항상 true)
-function isMyQuestion(q) {
-  return !isRealtime() || q.author_seat === rtSeat;
+// 내가 이 모둠의 사회자인지
+function amFacilitator() {
+  return isRealtime() && rtSeat != null && rtSeat === rtFacilitatorSeat;
+}
+
+// 이 질문을 수정·삭제할 수 있는지 (본인 또는 사회자)
+function canManageQuestion(q) {
+  return !isRealtime() || q.author_seat === rtSeat || amFacilitator();
 }
 
 // 로컬 분류 맵 — 실시간 모드에서 분류·별표는 각 기기에만 저장 (질문 id 키)
@@ -625,10 +631,10 @@ function renderOriginChip(q) {
 }
 
 function renderQuestionCard(q, concept) {
-  // 실시간 모드 작성자(자리) 라벨 + 본인 여부
+  // 실시간 모드 작성자(자리) 라벨 + 관리 권한(본인/사회자)
   const authorTag = (isRealtime() && q.author_seat)
-    ? `<div class="q-card-author">✍ ${q.author_seat}번${q.author_seat === rtSeat ? ' (나)' : ''}</div>` : '';
-  const mine = isMyQuestion(q);
+    ? `<div class="q-card-author">✍ ${q.author_seat}번${q.author_seat === rtSeat ? ' (나)' : ''}${q.author_seat === rtFacilitatorSeat ? ' 🙋' : ''}</div>` : '';
+  const mine = canManageQuestion(q);
 
   // 미분류 카드 — 클릭하면 개념 버튼이 인라인으로 펼쳐짐
   if (!concept) {
@@ -1511,6 +1517,9 @@ function renderRoomBar() {
         <button class="room-code-chip" id="roomCodeChip" title="코드 복사">${escapeHtml(rtAccessCode)} 📋</button>
         <span class="room-seat">내 자리 <b>${rtSeat}번</b></span>
         ${rtTopic ? `<span class="room-topic">🔍 ${escapeHtml(rtTopic)}</span>` : ''}
+        ${amFacilitator()
+          ? '<span class="room-fac">🙋 사회자 (나)</span>'
+          : `<button class="btn btn-secondary btn-room" id="btnSetFac">🙋 사회자 맡기${rtFacilitatorSeat ? ` (현재 ${rtFacilitatorSeat}번)` : ''}</button>`}
         <button class="btn btn-secondary btn-room" id="btnLeaveRoom">나가기</button>
       </div>`;
   } else if (rtPendingAccess) {
@@ -1594,6 +1603,7 @@ function bindRoomBar() {
   document.getElementById('btnJoinRoom')?.addEventListener('click', onJoinCode);
   document.getElementById('roomCodeInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') onJoinCode(); });
   document.getElementById('btnLeaveRoom')?.addEventListener('click', () => leaveRoom());
+  document.getElementById('btnSetFac')?.addEventListener('click', onSetFacilitator);
 
   document.getElementById('roomCodeChip')?.addEventListener('click', () =>
     navigator.clipboard?.writeText(rtAccessCode).then(() => flashAutosave()).catch(() => {}));
@@ -1986,6 +1996,7 @@ async function enterRoom(accessCode, seat) {
   if (bd.ok) {
     rtTopic = bd.session?.topic || rtTopic;
     rtClassCode = bd.session?.class_code || rtClassCode;
+    rtFacilitatorSeat = bd.session?.facilitator_seat ?? null;
     applyCards(bd.cards);
   }
   startPolling();
@@ -1993,9 +2004,21 @@ async function enterRoom(accessCode, seat) {
   updatePhaseBadges();
 }
 
+// 사회자 맡기 (내 자리를 사회자로)
+async function onSetFacilitator() {
+  if (!inRoom()) return;
+  const r = await CQC_RT.setFacilitator(rtAccessCode, rtSeat);
+  if (!r.ok) { alert('사회자 지정 실패: ' + r.error); return; }
+  rtFacilitatorSeat = rtSeat;
+  lastBoardSig = '';
+  renderRoomBar();
+  renderClassifyArea();
+}
+
 function leaveRoom(msg) {
   stopPolling();
   rtAccessCode = null; rtSeat = null; rtClassCode = null; rtTopic = '';
+  rtFacilitatorSeat = null;
   rtPendingAccess = null; rtEntryGroups = null; rtSessions = null; rtLobbyClass = null;
   state.questions = [];
   localStorage.removeItem('cqc_rt_join');
@@ -2038,6 +2061,12 @@ async function pollNow() {
   if (!res.ok) {
     if (res.code === 'P0002') leaveRoom('방이 종료되었어요.');
     return;
+  }
+  const fac = res.session ? (res.session.facilitator_seat ?? null) : rtFacilitatorSeat;
+  if (fac !== rtFacilitatorSeat) {
+    rtFacilitatorSeat = fac;
+    lastBoardSig = '';                 // 권한 표시가 바뀌므로 보드 강제 재렌더
+    if (!interactionActive()) renderRoomBar();
   }
   mergeBoard(res.cards);
 }
@@ -2141,6 +2170,7 @@ function hideHome() {
 function goHome() {
   stopPolling();
   rtAccessCode = null; rtSeat = null; rtClassCode = null; rtTopic = '';
+  rtFacilitatorSeat = null;
   rtEntryGroups = null; rtPendingAccess = null; rtSessions = null; rtLobbyClass = null;
   rtError = ''; state.questions = [];
   showHome();
