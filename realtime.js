@@ -41,22 +41,23 @@ const CQC_RT = (() => {
     await getClient().auth.signOut();
   }
 
-  // 승인 상태 조회 (approved / pending)
+  // 승인 상태 조회 — qar-question-card와 공용(my_teacher_status). null=비로그인.
   async function teacherStatus() {
-    const { data, error } = await getClient().rpc('cqc_teacher_status');
-    if (error) return { loggedIn: false };
-    return data;
+    const { data, error } = await getClient().rpc('my_teacher_status');
+    if (error || !data) return { loggedIn: false };
+    return { loggedIn: true, status: data.status, role: data.role,
+             email: data.email, display_name: data.display_name, school: data.school };
   }
 
-  // ── 관리자 (admin/superadmin) ──
+  // ── 관리자 (admin/superadmin) — qar 공용 RPC 재사용 ──
   async function listTeachers() {
-    const { data, error } = await getClient().rpc('cqc_list_teachers');
+    const { data, error } = await getClient().rpc('admin_list_teachers');
     if (error) return { ok: false, error: error.message };
     return { ok: true, teachers: data || [] };
   }
 
   async function setTeacherStatus(userId, status) {
-    const { error } = await getClient().rpc('cqc_set_teacher_status', {
+    const { error } = await getClient().rpc('set_teacher_status', {
       p_user_id: userId, p_status: status
     });
     return error ? { ok: false, error: error.message } : { ok: true };
@@ -64,7 +65,7 @@ const CQC_RT = (() => {
 
   // 역할 변경 (teacher <-> admin) — superadmin
   async function setTeacherRole(userId, role) {
-    const { error } = await getClient().rpc('cqc_set_teacher_role', {
+    const { error } = await getClient().rpc('set_teacher_role', {
       p_user_id: userId, p_role: role
     });
     return error ? { ok: false, error: error.message } : { ok: true };
