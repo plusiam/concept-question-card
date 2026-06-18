@@ -1554,6 +1554,32 @@ body {
   flex-wrap: wrap;
 }
 
+/* 접었다 펴는 비계 토글 — 기본 접힘이라 입력란과 미분류가 붙음 */
+.scaffold-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-main);
+  text-align: left;
+}
+.scaffold-toggle-hint {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+.scaffold-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .scaffold-title {
   font-size: 14px;
   font-weight: 700;

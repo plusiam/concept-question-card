@@ -16,6 +16,9 @@ let expandedCardId = null;
 // 질문 시작어 비계에서 펼쳐진 개념 id
 let scaffoldConceptId = null;
 
+// 질문 시작어 비계 펼침 상태 (기본 접힘 — 입력란과 미분류를 붙여 둠)
+let scaffoldOpen = false;
+
 // 1단계 단어에서 넘어온 질문에 붙일 출처 개념어 (다음 질문 추가 시 1회 소비)
 let pendingOriginWord = '';
 
@@ -536,27 +539,32 @@ function renderScaffold() {
   const selected = concepts.find(c => c.id === scaffoldConceptId);
 
   bar.innerHTML = `
-    <div class="scaffold-head">
+    <button type="button" class="scaffold-toggle${scaffoldOpen ? ' open' : ''}" id="scaffoldToggle" aria-expanded="${scaffoldOpen}">
       <span class="scaffold-title">💡 질문 시작어 비계</span>
-      <span class="scaffold-note">개념을 누르면 시작어가 나와요. 시작어를 누르면 입력란에 들어가요.</span>
-    </div>
-    <div class="scaffold-chips">
-      ${concepts.map(c => `
-        <button class="scaffold-chip${c.id === scaffoldConceptId ? ' on' : ''}" data-concept="${c.id}"
-          style="background:${c.palette.bg};color:${c.palette.text};border-color:${c.palette.accent}">
-          ${c.icon} ${c.name}
-        </button>
-      `).join('')}
-    </div>
-    ${selected ? `
-      <div class="scaffold-domains">
-        <span class="scaffold-domains-label">🔎 이런 걸 살펴봐요</span>
-        ${selected.domains.map(d => `<span class="domain-tag">${escapeHtml(d)}</span>`).join('')}
-      </div>
-      <div class="scaffold-starts">
-        ${selected.starts.map(s => `
-          <button class="start-chip" data-text="${escapeHtml(s)}">${escapeHtml(s)}</button>
-        `).join('')}
+      <span class="scaffold-toggle-hint">${scaffoldOpen ? '접기 ▴' : '도움말 열기 ▾'}</span>
+    </button>
+    ${scaffoldOpen ? `
+      <div class="scaffold-body">
+        <div class="scaffold-note">개념을 누르면 시작어가 나와요. 시작어를 누르면 입력란에 들어가요.</div>
+        <div class="scaffold-chips">
+          ${concepts.map(c => `
+            <button class="scaffold-chip${c.id === scaffoldConceptId ? ' on' : ''}" data-concept="${c.id}"
+              style="background:${c.palette.bg};color:${c.palette.text};border-color:${c.palette.accent}">
+              ${c.icon} ${c.name}
+            </button>
+          `).join('')}
+        </div>
+        ${selected ? `
+          <div class="scaffold-domains">
+            <span class="scaffold-domains-label">🔎 이런 걸 살펴봐요</span>
+            ${selected.domains.map(d => `<span class="domain-tag">${escapeHtml(d)}</span>`).join('')}
+          </div>
+          <div class="scaffold-starts">
+            ${selected.starts.map(s => `
+              <button class="start-chip" data-text="${escapeHtml(s)}">${escapeHtml(s)}</button>
+            `).join('')}
+          </div>
+        ` : ''}
       </div>
     ` : ''}
   `;
@@ -564,6 +572,11 @@ function renderScaffold() {
 
 function bindScaffold() {
   document.getElementById('scaffoldBar')?.addEventListener('click', e => {
+    if (e.target.closest('.scaffold-toggle')) {
+      scaffoldOpen = !scaffoldOpen;
+      renderScaffold();
+      return;
+    }
     const chip = e.target.closest('.scaffold-chip');
     if (chip) {
       scaffoldConceptId = (scaffoldConceptId === chip.dataset.concept) ? null : chip.dataset.concept;
@@ -589,7 +602,10 @@ function renderClassifyArea() {
   const host = document.getElementById('classifyArea');
   if (!host) return;
   const concepts = getActiveConcepts();
-  const unclassified = state.questions.filter(q => q.conceptIds.length === 0);
+  // 미분류는 새 질문이 맨 위에 오도록 역순(새 질문은 늘 배열 끝에 추가되므로 reverse하면 맨 위)
+  const unclassified = state.questions
+    .filter(q => q.conceptIds.length === 0)
+    .reverse();
 
   const boardHtml = concepts.map(c => {
     const cards = state.questions.filter(q => q.conceptIds.includes(c.id));
