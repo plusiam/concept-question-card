@@ -43,6 +43,7 @@ let pendingRemote = false;  // 상호작용 중 들어온 갱신 보류 플래�
 let pendingCards = null;    // 보류된 최신 보드 카드
 let lastBoardSig = '';      // 마지막 적용한 보드 서명 (불필요 재렌더 방지)
 let appRealtime = false;    // 이번 진입의 실행 모드 (홈/URL에서 결정)
+let teacherConsole = false; // 교사/관리자 진입 — 학생 보드 대신 선생님 콘솔 표시 중
 
 // 실시간 모드로 들어왔고 연결 설정도 갖춰졌을 때만 true
 function isRealtime() {
@@ -2039,13 +2040,13 @@ async function onTeacherLogin() {
   rtError = '';
   // Google로 이동 → 진입 종류(teacher/admin) 화면으로 복귀
   const res = await CQC_RT.teacherLoginGoogle(rtEntry === 'admin' ? 'admin' : 'teacher');
-  if (!res.ok) { rtError = '로그인 실패: ' + res.error; renderRoomBar(); showTeacherArea(); }
+  if (!res.ok) { rtError = '로그인 실패: ' + res.error; refreshTeacherSurface(); }
 }
 
 async function onTeacherLogout() {
   await CQC_RT.teacherLogout();
   rtTeacher = null; rtTeacherStatus = null; rtTeacherRole = null;
-  renderRoomBar(); showTeacherArea();
+  refreshTeacherSurface();
 }
 
 // 승인 상태 다시 조회 — 일시적 오류로 상태를 못 받았을 때(또는 방금 승인됐을 때) 재확인
@@ -2053,12 +2054,51 @@ async function onTeacherRecheck() {
   const st = await CQC_RT.teacherStatus();
   rtTeacherStatus = st.loggedIn ? st.status : null;
   rtTeacherRole = st.loggedIn ? st.role : null;
-  renderRoomBar(); showTeacherArea();
+  refreshTeacherSurface();
 }
 
 function showTeacherArea() {
   const a = document.getElementById('teacherArea');
   if (a) a.style.display = '';
+}
+
+// 교사/관리자 진입 시 학생 보드(단계 탭·비계·7컬럼)를 숨기고 선생님 콘솔만 노출 (반대면 원복)
+function setTeacherConsole(on) {
+  teacherConsole = on;
+  const nav = document.getElementById('phaseNav');
+  const help = document.getElementById('stepHelp');
+  const main = document.querySelector('.app-main');
+  const meta = document.querySelector('.header-meta');   // 주제·이름·맥락(학생 활동용) — 콘솔에선 숨김
+  const ts = document.getElementById('teacherScreen');
+  if (nav) nav.style.display = on ? 'none' : '';
+  if (help) help.style.display = on ? 'none' : '';
+  if (main) main.style.display = on ? 'none' : '';
+  if (meta) meta.style.display = on ? 'none' : '';
+  if (ts) ts.hidden = !on;
+  // 콘솔에선 학생용 헤더 버튼까지 숨겨 깔끔하게 (🏠 홈만 남김)
+  ['btnExport', 'btnSettings'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = on ? 'none' : '';
+  });
+}
+
+// 선생님 콘솔 렌더 — 로그인 상태/승인 상태에 따라 적절한 버튼(renderTeacherArea 재사용)
+function renderTeacherScreen() {
+  const host = document.getElementById('teacherScreen');
+  if (!host) return;
+  host.innerHTML = `
+    <div class="teacher-console">
+      <h2 class="tc-title">🧑‍🏫 선생님 콘솔</h2>
+      <p class="tc-guide">학반을 만들면 교실에 붙일 <b>학반 QR·코드</b>가 나와요. 매 수업은 학반 안에서 '오늘 수업'으로 열고, 학생은 학반 코드 하나로 들어옵니다.</p>
+      <div class="tc-area">${renderTeacherArea()}</div>
+    </div>`;
+  bindRoomBar();
+}
+
+// 교사 UI 갱신 — 콘솔 모드면 선생님 콘솔을, 아니면 방 바의 교사 영역을 다시 그림
+function refreshTeacherSurface() {
+  if (teacherConsole) renderTeacherScreen();
+  else { renderRoomBar(); showTeacherArea(); }
 }
 
 // ── 폴링 ──────────────────────────────────────────────
@@ -2187,6 +2227,7 @@ function goHome() {
   rtFacilitatorSeat = null;
   rtEntryGroups = null; rtPendingAccess = null; rtSessions = null; rtLobbyClass = null;
   rtError = ''; state.questions = [];
+  setTeacherConsole(false);   // 콘솔 숨기고 학생 보드 화면 원복
   showHome();
 }
 
@@ -2206,6 +2247,7 @@ function enterApp(entry) {
   rtEntry = entry;
   if (entry === 'local' || entry === 'gather') {
     appRealtime = false;
+    setTeacherConsole(false);     // 교사 콘솔에서 돌아왔을 때 학생 보드 화면 원복
     loadState();                  // 홈에서 다시 들어올 때 로컬 보드 복원
     updateHeader();
     applyHeaderMode();
@@ -2219,13 +2261,19 @@ function enterApp(entry) {
   appRealtime = true;
   applyHeaderMode();
   state.questions = [];
-  switchPhase(1);
-  renderClassifyArea();
-  updatePhaseBadges();
+  const isTeacherEntry = entry === 'teacher' || entry === 'admin';
+  if (isTeacherEntry) {
+    setTeacherConsole(true);
+    renderTeacherScreen();        // 로그인/승인 상태 알기 전 먼저 렌더(로그인 버튼 등)
+  } else {
+    setTeacherConsole(false);
+    switchPhase(1);
+    renderClassifyArea();
+    updatePhaseBadges();
+  }
   initRealtime().then(() => {
-    if (entry === 'teacher' || entry === 'admin') {
-      renderRoomBar();
-      showTeacherArea();
+    if (isTeacherEntry) {
+      renderTeacherScreen();      // 로그인·승인 상태 반영해 다시 렌더
       const isAdmin = rtTeacherRole === 'admin' || rtTeacherRole === 'superadmin';
       if (entry === 'admin' && isAdmin) openAdminPanel();
       else if (entry === 'teacher' && rtTeacherStatus === 'approved') openManagePanel();  // 승인 교사 → 학반 관리 바로 열기
