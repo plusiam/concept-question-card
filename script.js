@@ -1580,22 +1580,26 @@ function renderTeacherArea() {
         <span class="room-or">로그인 후 학급(방)을 만들 수 있어요</span>
       </div>`;
   }
-  // 로그인됨 + 승인 대기 → 안내만
-  if (rtTeacherStatus && rtTeacherStatus !== 'approved') {
+  // 로그인됨 + 명시적 승인일 때만 학반 관리 노출 (fail-closed — 상태를 못 받았으면 관리 화면 숨김)
+  if (rtTeacherStatus === 'approved') {
+    const isAdmin = rtTeacherRole === 'admin' || rtTeacherRole === 'superadmin';
     return `
       <div class="teacher-row">
         <span class="room-bar-label">🧑‍🏫 ${escapeHtml(rtTeacher.email || '교사')}</span>
-        <span class="room-pending">⏳ 승인 대기 중이에요. 관리자 승인 후 학급을 만들 수 있어요.</span>
+        <button class="btn btn-primary btn-room" id="btnManage">🏫 학반 관리</button>
+        ${isAdmin ? '<button class="btn btn-secondary btn-room" id="btnAdmin">👑 관리자</button>' : ''}
         <button class="room-teacher-toggle" id="btnTeacherLogout">로그아웃</button>
       </div>`;
   }
-  // 로그인됨 + 승인 → 학반 관리
-  const isAdmin = rtTeacherRole === 'admin' || rtTeacherRole === 'superadmin';
+  // 로그인됨 + 미승인 또는 상태 미확인 → 안내 (status가 비면 일시적 오류일 수 있어 다시 확인 버튼 제공)
+  const pendingMsg = rtTeacherStatus
+    ? '⏳ 승인 대기 중이에요. 관리자 승인 후 학급을 만들 수 있어요.'
+    : '⏳ 승인 상태를 확인하지 못했어요. 잠시 뒤 새로고침하거나 다시 확인해 주세요.';
   return `
     <div class="teacher-row">
       <span class="room-bar-label">🧑‍🏫 ${escapeHtml(rtTeacher.email || '교사')}</span>
-      <button class="btn btn-primary btn-room" id="btnManage">🏫 학반 관리</button>
-      ${isAdmin ? '<button class="btn btn-secondary btn-room" id="btnAdmin">👑 관리자</button>' : ''}
+      <span class="room-pending">${pendingMsg}</span>
+      ${rtTeacherStatus ? '' : '<button class="btn btn-secondary btn-room" id="btnTeacherRecheck">🔄 다시 확인</button>'}
       <button class="room-teacher-toggle" id="btnTeacherLogout">로그아웃</button>
     </div>`;
 }
@@ -1627,6 +1631,7 @@ function bindRoomBar() {
     if (a) a.style.display = a.style.display === 'none' ? '' : 'none';
   });
   document.getElementById('btnTeacherLogin')?.addEventListener('click', onTeacherLogin);
+  document.getElementById('btnTeacherRecheck')?.addEventListener('click', onTeacherRecheck);
   document.getElementById('btnTeacherLogout')?.addEventListener('click', onTeacherLogout);
   document.getElementById('btnManage')?.addEventListener('click', openManagePanel);
   document.getElementById('btnAdmin')?.addEventListener('click', openAdminPanel);
@@ -2043,6 +2048,14 @@ async function onTeacherLogout() {
   renderRoomBar(); showTeacherArea();
 }
 
+// 승인 상태 다시 조회 — 일시적 오류로 상태를 못 받았을 때(또는 방금 승인됐을 때) 재확인
+async function onTeacherRecheck() {
+  const st = await CQC_RT.teacherStatus();
+  rtTeacherStatus = st.loggedIn ? st.status : null;
+  rtTeacherRole = st.loggedIn ? st.role : null;
+  renderRoomBar(); showTeacherArea();
+}
+
 function showTeacherArea() {
   const a = document.getElementById('teacherArea');
   if (a) a.style.display = '';
@@ -2222,9 +2235,12 @@ function enterApp(entry) {
 
 function routeEntry() {
   const p = new URLSearchParams(location.search);
-  if (p.get('code')) return enterApp('student');     // 학생 QR/링크
+  // 교사/관리자 진입을 먼저 확인 — OAuth(향후 PKCE 전환 시)가 ?code= 를 덧붙여도 학생 흐름으로 새지 않게
   if (p.has('admin')) return enterApp('admin');
   if (p.has('teacher') || p.has('manage')) return enterApp('teacher');
+  // 학생 QR/링크는 학반코드(C-XXXXXXXX) 또는 수업·모둠코드(4자리)일 때만 (initRealtime과 동일 패턴)
+  const code = (p.get('code') || '').toUpperCase();
+  if (/^C-[A-Z0-9]{8}$/.test(code) || /^[0-9]{4}$/.test(code)) return enterApp('student');
   if (p.has('rt') || p.has('realtime')) return enterApp('realtime');
   if (CONFIG.BACKEND_MODE === 'realtime') return enterApp('realtime');
   showHome();
