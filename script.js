@@ -1574,14 +1574,10 @@ function renderTeacherArea() {
   return `
     <div class="teacher-row">
       <span class="room-bar-label">🧑‍🏫 ${escapeHtml(rtTeacher.email || '교사')}</span>
-      <label>모둠 수 <input id="tgCount" class="room-num-input" type="number" min="1" max="8" value="4"></label>
-      <label>주제 <input id="tgTopic" class="room-topic-input" maxlength="120" placeholder="예: 놀이터" value="${escapeHtml(state.unitMeta.unitTitle || '')}"></label>
-      <button class="btn btn-primary btn-room" id="btnCreateClass">학급 개설</button>
-      <button class="btn btn-secondary btn-room" id="btnMyClasses">📋 내 학급</button>
+      <button class="btn btn-primary btn-room" id="btnManage">🏫 학반 관리</button>
       ${isAdmin ? '<button class="btn btn-secondary btn-room" id="btnAdmin">👑 관리자</button>' : ''}
       <button class="room-teacher-toggle" id="btnTeacherLogout">로그아웃</button>
-    </div>
-    ${created}`;
+    </div>`;
 }
 
 function bindRoomBar() {
@@ -1611,8 +1607,7 @@ function bindRoomBar() {
   });
   document.getElementById('btnTeacherLogin')?.addEventListener('click', onTeacherLogin);
   document.getElementById('btnTeacherLogout')?.addEventListener('click', onTeacherLogout);
-  document.getElementById('btnCreateClass')?.addEventListener('click', onCreateClass);
-  document.getElementById('btnMyClasses')?.addEventListener('click', openClassesPanel);
+  document.getElementById('btnManage')?.addEventListener('click', openManagePanel);
   document.getElementById('btnAdmin')?.addEventListener('click', openAdminPanel);
 }
 
@@ -1718,6 +1713,146 @@ async function onDownloadClass(classCode, topic) {
 }
 
 // ── 관리자 패널 (admin/superadmin) — 교사 승인 관리 ──
+// ── 교사 관리 패널 (학반 만들기 / 내 학반 → 오늘 수업·QR·이름·삭제) ──
+async function openManagePanel() {
+  document.getElementById('manageOverlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'manageOverlay';
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-box modal-box-lg">
+      <div class="modal-title">🏫 학반 관리</div>
+      <div class="modal-subtitle">학반을 만들면 교실에 붙일 학반 QR이 나와요. 매 수업은 학반 안에서 '오늘 수업'으로 열어요.</div>
+      <div class="manage-new">
+        <input id="newClassLabel" class="room-text-input" maxlength="40" placeholder="학반 이름 (예: 남부초 5-3)">
+        <button class="btn btn-primary btn-room" id="btnNewClass">＋ 학반 만들기</button>
+      </div>
+      <div class="admin-section-title">🏫 내 학반</div>
+      <div class="manage-classes" id="manageClasses"><div class="list-empty">불러오는 중…</div></div>
+      <div class="modal-actions"><button class="btn btn-secondary" id="btnManageClose">닫기</button></div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.getElementById('btnManageClose').addEventListener('click', () => overlay.remove());
+  document.getElementById('btnNewClass').addEventListener('click', onNewClass);
+  document.getElementById('newClassLabel').addEventListener('keydown', e => { if (e.key === 'Enter') onNewClass(); });
+  refreshManageClasses();
+}
+
+async function onNewClass() {
+  const el = document.getElementById('newClassLabel');
+  const label = (el?.value || '').trim();
+  if (!label) { el?.focus(); return; }
+  const res = await CQC_RT.classCreate(label);
+  if (!res.ok) { alert('학반 만들기 실패: ' + res.error); return; }
+  if (el) el.value = '';
+  refreshManageClasses();
+}
+
+async function refreshManageClasses() {
+  const host = document.getElementById('manageClasses');
+  if (!host) return;
+  const res = await CQC_RT.classList();
+  if (!res.ok) { host.innerHTML = `<div class="list-empty">${escapeHtml(res.error)}</div>`; return; }
+  if (!res.classes.length) { host.innerHTML = '<div class="list-empty">아직 학반이 없어요. 위에서 학반을 만들어요.</div>'; return; }
+  host.innerHTML = res.classes.map(c => `
+    <div class="class-card" data-code="${c.class_code}">
+      <div class="class-card-head">
+        <span class="class-code-big">${escapeHtml(c.class_code)}</span>
+        <span class="class-topic">${escapeHtml(c.class_label)}</span>
+        <div class="class-card-actions">
+          <button class="room-link-copy mg-act" data-act="link" data-link="${roomLink(c.class_code)}">🔗 학반 링크</button>
+          <button class="room-link-copy mg-act" data-act="rename" data-code="${c.class_code}" data-label="${escapeHtml(c.class_label)}">이름 바꾸기</button>
+          <button class="room-link-copy mg-act" data-act="del" data-code="${c.class_code}" data-label="${escapeHtml(c.class_label)}">완전 삭제</button>
+        </div>
+      </div>
+      <div class="class-qr-row">
+        <div class="class-qr">${qrSvg(roomLink(c.class_code))}</div>
+        <div class="class-qr-cap">학반 QR — 교실에 붙여 두면 학생이 매 수업 이걸로 들어와요</div>
+      </div>
+      <div class="mg-open-row">
+        <input class="mg-title room-text-input" maxlength="120" placeholder="오늘 수업 제목 (예: 놀이터 탐구)">
+        <input class="mg-topic room-text-input" maxlength="120" placeholder="주제 (예: 놀이터)">
+        <label>모둠 <input class="mg-count room-num-input" type="number" min="1" max="8" value="4"></label>
+        <button class="btn btn-primary btn-room mg-act" data-act="open" data-code="${c.class_code}">＋ 오늘 수업 열기</button>
+      </div>
+      <button class="mg-act mg-toggle room-teacher-toggle" data-act="sessions" data-code="${c.class_code}">오늘 수업 ${c.sessions}개 보기 ▾</button>
+      <div class="mg-sessions" id="sess-${c.class_code}"></div>
+    </div>`).join('');
+  host.querySelectorAll('.mg-act').forEach(b => b.addEventListener('click', onManageAction));
+}
+
+async function onManageAction(e) {
+  const b = e.currentTarget;
+  const act = b.dataset.act;
+  if (act === 'link') {
+    navigator.clipboard?.writeText(b.dataset.link).then(() => { const t=b.textContent; b.textContent='복사됨'; setTimeout(()=>b.textContent=t,1200); });
+    return;
+  }
+  if (act === 'rename') {
+    const nv = prompt('학반 새 이름', b.dataset.label);
+    if (nv == null || !nv.trim()) return;
+    const r = await CQC_RT.classRename(b.dataset.code, nv.trim());
+    if (!r.ok) return alert('변경 실패: ' + r.error);
+    refreshManageClasses();
+    return;
+  }
+  if (act === 'del') {
+    if (!confirm(`학반 "${b.dataset.label}"과 그 안의 모든 수업·모둠·질문을 삭제할까요? 되돌릴 수 없어요.`)) return;
+    const r = await CQC_RT.classDelete(b.dataset.code);
+    if (!r.ok) return alert('삭제 실패: ' + r.error);
+    refreshManageClasses();
+    return;
+  }
+  if (act === 'open') {
+    const card = b.closest('.class-card');
+    const title = card.querySelector('.mg-title').value.trim();
+    const topic = card.querySelector('.mg-topic').value.trim();
+    const count = parseInt(card.querySelector('.mg-count').value) || 4;
+    b.disabled = true;
+    const r = await CQC_RT.sessionOpen(b.dataset.code, title, count, topic);
+    b.disabled = false;
+    if (!r.ok) return alert('수업 열기 실패: ' + r.error);
+    card.querySelector('.mg-title').value = ''; card.querySelector('.mg-topic').value = '';
+    await loadSessions(b.dataset.code, true);
+    return;
+  }
+  if (act === 'sessions') {
+    const open = document.getElementById('sess-' + b.dataset.code).dataset.open === '1';
+    if (open) { document.getElementById('sess-' + b.dataset.code).innerHTML = ''; document.getElementById('sess-' + b.dataset.code).dataset.open = ''; b.textContent = b.textContent.replace('▴','▾'); }
+    else { await loadSessions(b.dataset.code); b.textContent = b.textContent.replace('▾','▴'); }
+    return;
+  }
+  if (act === 'seslink') {
+    navigator.clipboard?.writeText(b.dataset.link).then(() => { const t=b.textContent; b.textContent='복사됨'; setTimeout(()=>b.textContent=t,1200); });
+    return;
+  }
+  if (act === 'sesdel') {
+    if (!confirm(`'${b.dataset.title || b.dataset.sess}' 수업을 삭제할까요?`)) return;
+    const r = await CQC_RT.sessionDelete(b.dataset.sess);
+    if (!r.ok) return alert('삭제 실패: ' + r.error);
+    loadSessions(b.dataset.code, true);
+    return;
+  }
+}
+
+async function loadSessions(classCode, keepOpen) {
+  const host = document.getElementById('sess-' + classCode);
+  if (!host) return;
+  host.dataset.open = '1';
+  const res = await CQC_RT.sessionList(classCode);
+  if (!res.ok) { host.innerHTML = `<div class="list-empty small">${escapeHtml(res.error)}</div>`; return; }
+  if (!res.sessions.length) { host.innerHTML = '<div class="list-empty small">아직 연 수업이 없어요. 위에서 \'오늘 수업 열기\'.</div>'; return; }
+  host.innerHTML = res.sessions.map(s => `
+    <div class="mg-session">
+      <span class="group-link-code">${escapeHtml(s.session_code)}</span>
+      <span class="mg-session-meta">${escapeHtml(s.session_title || '(제목 없음)')}${s.topic ? ' · 🔍' + escapeHtml(s.topic) : ''} · 모둠 ${s.groups}</span>
+      <button class="room-link-copy mg-act" data-act="seslink" data-link="${roomLink(s.session_code)}">🔗 수업 링크</button>
+      <button class="room-link-copy mg-act" data-act="sesdel" data-sess="${escapeHtml(s.session_code)}" data-code="${classCode}" data-title="${escapeHtml(s.session_title || '')}">삭제</button>
+    </div>`).join('');
+  host.querySelectorAll('.mg-act').forEach(b => b.addEventListener('click', onManageAction));
+}
+
 async function openAdminPanel() {
   document.getElementById('adminOverlay')?.remove();
   const isSuper = rtTeacherRole === 'superadmin';

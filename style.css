@@ -1453,6 +1453,22 @@ body {
 .admin-btn { padding: 5px 12px; font-size: 13px; }
 .admin-self { font-size: 12px; color: var(--color-text-sub); }
 
+/* ── 교사 관리 패널 (학반/수업) ── */
+.manage-new { display: flex; gap: 8px; margin: 8px 0 4px; flex-wrap: wrap; }
+.manage-new .room-text-input { flex: 1; min-width: 180px; }
+.manage-classes { display: flex; flex-direction: column; gap: 14px; max-height: 62vh; overflow-y: auto; margin: 4px 0; }
+.mg-open-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+.mg-open-row .mg-title, .mg-open-row .mg-topic { flex: 1; min-width: 130px; }
+.mg-toggle { margin-top: 8px; margin-left: 0; }
+.mg-sessions { display: flex; flex-direction: column; gap: 6px; }
+.mg-sessions:not(:empty) { margin-top: 8px; }
+.mg-session {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 8px; padding: 7px 10px;
+}
+.mg-session-meta { flex: 1; min-width: 0; font-size: 13px; color: var(--color-text-sub); }
+.list-empty.small { font-size: 12px; padding: 6px 0; }
+
 /* ── 내 학급 콘솔 (링크 + QR) ── */
 .classes-list { display: flex; flex-direction: column; gap: 14px; max-height: 60vh; overflow-y: auto; margin: 8px 0; }
 .class-card { border: 1px solid var(--color-border); border-radius: 12px; padding: 12px; }

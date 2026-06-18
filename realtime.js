@@ -84,7 +84,47 @@ const CQC_RT = (() => {
     return error ? { ok: false, error: error.message } : { ok: true };
   }
 
-  // ── 교사: 내가 만든 학급 목록 ──
+  // ── 교사: 영구 학반 + 오늘 수업 (Phase 3) ──
+  async function classCreate(label) {
+    const { data, error } = await getClient().rpc('cqc_create_class', { p_class_label: label });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, classCode: data.class_code };
+  }
+  async function classList() {
+    const { data, error } = await getClient().rpc('cqc_list_classes');
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, classes: data || [] };
+  }
+  async function classRename(classCode, newLabel) {
+    const { error } = await getClient().rpc('cqc_rename_class', { p_class_code: classCode, p_new_label: newLabel });
+    return error ? { ok: false, error: error.message } : { ok: true };
+  }
+  async function classDelete(classCode) {
+    const { error } = await getClient().rpc('cqc_delete_class', { p_class_code: classCode });
+    return error ? { ok: false, error: error.message } : { ok: true };
+  }
+  async function sessionOpen(classCode, title, count, topic) {
+    const { data, error } = await getClient().rpc('cqc_open_session', {
+      p_class_code: classCode, p_session_title: title, p_count: count, p_topic: topic
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, sessionCode: data.session_code, count: data.count };
+  }
+  async function sessionList(classCode) {
+    const { data, error } = await getClient().rpc('cqc_list_class_sessions', { p_class_code: classCode });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, sessions: data || [] };
+  }
+  async function sessionRename(sessionCode, title, topic) {
+    const { error } = await getClient().rpc('cqc_rename_session', { p_session_code: sessionCode, p_title: title, p_topic: topic });
+    return error ? { ok: false, error: error.message } : { ok: true };
+  }
+  async function sessionDelete(sessionCode) {
+    const { error } = await getClient().rpc('cqc_delete_session', { p_session_code: sessionCode });
+    return error ? { ok: false, error: error.message } : { ok: true };
+  }
+
+  // ── 교사: 내가 만든 학급 목록 (옛 단순 모델 — Phase 5에서 정리) ──
   async function myClasses() {
     const { data, error } = await getClient().rpc('cqc_my_classes');
     if (error) return { ok: false, error: error.message };
@@ -148,6 +188,8 @@ const CQC_RT = (() => {
     isConfigured,
     getTeacher, teacherLoginGoogle, teacherLogout, teacherStatus,
     listTeachers, setTeacherStatus, setTeacherRole, adminListClasses, adminDeleteClass,
+    classCreate, classList, classRename, classDelete,
+    sessionOpen, sessionList, sessionRename, sessionDelete,
     myClasses, classResults, createClass, classGroups, board,
     addQuestion, editQuestion, deleteQuestion
   };
