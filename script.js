@@ -35,7 +35,6 @@ let rtSessions = null;      // 학반 로비: 오늘 수업 목록
 let rtLobbyClass = null;    // 로비 중인 학반 코드
 let rtLobbyLabel = '';      // 로비 중인 학반 이름
 let rtPendingAccess = null; // 자리 고르기 대기 중인 모둠 코드
-let rtCreated = null;       // 방금 개설한 학급 정보 {classCode, count}
 let rtError = '';           // 방 바 에러 메시지
 let rtDragging = false;     // 드래그 진행 중 (폴링 갱신 보류용)
 let pendingRemote = false;  // 상호작용 중 들어온 갱신 보류 플래그
@@ -1578,13 +1577,7 @@ function renderTeacherArea() {
         <button class="room-teacher-toggle" id="btnTeacherLogout">로그아웃</button>
       </div>`;
   }
-  // 로그인됨 + 승인 → 학급 개설 폼
-  const created = rtCreated
-    ? `<div class="room-created">
-         학급 코드 <b class="room-code-chip" id="createdClassChip" title="복사">${escapeHtml(rtCreated.classCode)} 📋</b>
-         · 모둠 ${rtCreated.count}개 만들어졌어요. 학생에게 학급 코드를 알려주세요.
-       </div>`
-    : '';
+  // 로그인됨 + 승인 → 학반 관리
   const isAdmin = rtTeacherRole === 'admin' || rtTeacherRole === 'superadmin';
   return `
     <div class="teacher-row">
@@ -1602,8 +1595,6 @@ function bindRoomBar() {
 
   document.getElementById('roomCodeChip')?.addEventListener('click', () =>
     navigator.clipboard?.writeText(rtAccessCode).then(() => flashAutosave()).catch(() => {}));
-  document.getElementById('createdClassChip')?.addEventListener('click', () =>
-    navigator.clipboard?.writeText(rtCreated.classCode).then(() => flashAutosave()).catch(() => {}));
 
   document.querySelectorAll('.group-btn').forEach(b => b.addEventListener('click', () => {
     rtPendingAccess = b.dataset.acc;
@@ -1646,68 +1637,7 @@ function qrSvg(url) {
   return makeQrSvg(url, 3, 1) || '<div class="qr-fallback">QR 없음</div>';
 }
 
-async function openClassesPanel() {
-  document.getElementById('classesOverlay')?.remove();
-  const res = await CQC_RT.myClasses();
-  if (!res.ok) { alert('학급 목록을 불러오지 못했어요: ' + res.error); return; }
-
-  const overlay = document.createElement('div');
-  overlay.id = 'classesOverlay';
-  overlay.className = 'modal-overlay';
-  overlay.innerHTML = `
-    <div class="modal-box">
-      <div class="modal-title">📋 내 학급</div>
-      <div class="modal-subtitle">학급별 모둠 코드·입장 링크·QR이에요. 학생에게 QR을 보여주면 코드 없이 바로 들어와요.</div>
-      <div class="classes-list">${renderClassesList(res.classes)}</div>
-      <div class="modal-actions">
-        <button class="btn btn-secondary" id="btnClassesClose">닫기</button>
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-  document.getElementById('btnClassesClose').addEventListener('click', () => overlay.remove());
-  // 링크 복사 (JSON 버튼 제외)
-  overlay.querySelectorAll('.room-link-copy:not(.class-json-btn)').forEach(b => b.addEventListener('click', () => {
-    const label = b.textContent;
-    navigator.clipboard?.writeText(b.dataset.link).then(() => { b.textContent = '복사됨'; setTimeout(() => b.textContent = label, 1200); }).catch(() => {});
-  }));
-  // JSON 저장
-  overlay.querySelectorAll('.class-json-btn').forEach(b => b.addEventListener('click', () =>
-    onDownloadClass(b.dataset.class, b.dataset.topic)));
-}
-
-function renderClassesList(classes) {
-  if (!classes.length) return '<div class="list-empty">아직 만든 학급이 없어요. \'학급 개설\'로 시작해요.</div>';
-  return classes.map(cls => `
-    <div class="class-card">
-      <div class="class-card-head">
-        <span class="class-code-big">${escapeHtml(cls.class_code)}</span>
-        <span class="class-topic">🔍 ${escapeHtml(cls.topic || '주제 없음')}</span>
-        <div class="class-card-actions">
-          <button class="room-link-copy" data-link="${roomLink(cls.class_code)}">🔗 수업 링크</button>
-          <button class="room-link-copy class-json-btn" data-class="${escapeHtml(cls.class_code)}" data-topic="${escapeHtml(cls.topic || '')}">📄 JSON 저장</button>
-        </div>
-      </div>
-      <div class="class-qr-row">
-        <div class="class-qr">${qrSvg(roomLink(cls.class_code))}</div>
-        <div class="class-qr-cap">수업 QR — 학생이 찍으면 모둠 고르기로 들어와요</div>
-      </div>
-      <div class="group-link-grid">
-        ${cls.groups.map(g => `
-          <div class="group-link-item">
-            <div class="group-link-qr">${qrSvg(roomLink(g.access_code))}</div>
-            <div class="group-link-no">${g.group_no}모둠</div>
-            <div class="group-link-code">${escapeHtml(g.access_code)}</div>
-            <button class="room-link-copy" data-link="${roomLink(g.access_code)}">링크 복사</button>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  `).join('');
-}
-
-// 결과물 JSON 다운로드
+// 결과물 JSON 다운로드 헬퍼
 function downloadJSON(obj, namePart) {
   const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -1720,13 +1650,14 @@ function downloadJSON(obj, namePart) {
   URL.revokeObjectURL(url);
 }
 
-async function onDownloadClass(classCode, topic) {
-  const res = await CQC_RT.classResults(classCode);
+// 수업(오늘 수업) 결과물 JSON 저장 — 🧺 모둠 모으기의 입력
+async function onDownloadSession(sessionCode, title) {
+  const res = await CQC_RT.classResults(sessionCode);
   if (!res.ok || !res.result) { alert('결과물을 불러오지 못했어요.'); return; }
   downloadJSON({
     app: 'concept-question-card', type: 'class-results', version: 1,
     exportedAt: new Date().toISOString(), ...res.result
-  }, `학급${classCode}_${(topic || '').trim() || '결과'}`);
+  }, `수업${sessionCode}_${(title || '').trim() || '결과'}`);
 }
 
 // ── 관리자 패널 (admin/superadmin) — 교사 승인 관리 ──
@@ -1844,6 +1775,10 @@ async function onManageAction(e) {
     navigator.clipboard?.writeText(b.dataset.link).then(() => { const t=b.textContent; b.textContent='복사됨'; setTimeout(()=>b.textContent=t,1200); });
     return;
   }
+  if (act === 'sessave') {
+    onDownloadSession(b.dataset.sess, b.dataset.title);
+    return;
+  }
   if (act === 'sesdel') {
     if (!confirm(`'${b.dataset.title || b.dataset.sess}' 수업을 삭제할까요?`)) return;
     const r = await CQC_RT.sessionDelete(b.dataset.sess);
@@ -1865,6 +1800,7 @@ async function loadSessions(classCode, keepOpen) {
       <span class="group-link-code">${escapeHtml(s.session_code)}</span>
       <span class="mg-session-meta">${escapeHtml(s.session_title || '(제목 없음)')}${s.topic ? ' · 🔍' + escapeHtml(s.topic) : ''} · 모둠 ${s.groups}</span>
       <button class="room-link-copy mg-act" data-act="seslink" data-link="${roomLink(s.session_code)}">🔗 수업 링크</button>
+      <button class="room-link-copy mg-act" data-act="sessave" data-sess="${escapeHtml(s.session_code)}" data-title="${escapeHtml(s.session_title || '')}">📄 결과 저장</button>
       <button class="room-link-copy mg-act" data-act="sesdel" data-sess="${escapeHtml(s.session_code)}" data-code="${classCode}" data-title="${escapeHtml(s.session_title || '')}">삭제</button>
     </div>`).join('');
   host.querySelectorAll('.mg-act').forEach(b => b.addEventListener('click', onManageAction));
@@ -1965,8 +1901,8 @@ function renderAdminClasses(classes) {
   host.innerHTML = classes.map(c => `
     <div class="admin-row">
       <div class="admin-who">
-        <div class="admin-name">학급 ${escapeHtml(c.class_code)} · 🔍 ${escapeHtml(c.topic || '주제 없음')}</div>
-        <div class="admin-meta">모둠 ${c.groups}개 · 질문 ${c.cards}개 · ${escapeHtml(c.teacher || '?')}</div>
+        <div class="admin-name">${escapeHtml(c.label || '학반')} <span class="group-link-code">${escapeHtml(c.class_code)}</span></div>
+        <div class="admin-meta">수업 ${c.sessions}개 · 질문 ${c.cards}개 · ${escapeHtml(c.teacher || '?')}</div>
       </div>
       <div class="admin-action">
         ${isSuper ? `<button class="btn btn-secondary admin-btn admin-del" data-code="${escapeHtml(c.class_code)}">🗑 삭제</button>` : '<span class="admin-self">보기 전용</span>'}
@@ -2069,17 +2005,7 @@ async function onTeacherLogin() {
 
 async function onTeacherLogout() {
   await CQC_RT.teacherLogout();
-  rtTeacher = null; rtTeacherStatus = null; rtTeacherRole = null; rtCreated = null;
-  renderRoomBar(); showTeacherArea();
-}
-
-async function onCreateClass() {
-  rtError = '';
-  const count = parseInt(document.getElementById('tgCount')?.value) || 4;
-  const topic = document.getElementById('tgTopic')?.value.trim() || '';
-  const res = await CQC_RT.createClass(count, topic);
-  if (!res.ok) { rtError = '개설 실패: ' + res.error; renderRoomBar(); showTeacherArea(); return; }
-  rtCreated = { classCode: res.classCode, count: res.count };
+  rtTeacher = null; rtTeacherStatus = null; rtTeacherRole = null;
   renderRoomBar(); showTeacherArea();
 }
 
